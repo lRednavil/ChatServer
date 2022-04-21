@@ -141,8 +141,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ChatServer.cpp" />
+    <ClCompile Include="Dump.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ChatServer.h" />
+    <ClInclude Include="Dump.h" />
     <ClInclude Include="LockFreeMemoryPool.h" />
     <ClInclude Include="LockFreeQueue.h" />
     <ClInclude Include="LockFreeStack.h" />

@@ -6,34 +6,53 @@
 #include "LockFreeStack.h"
 #include "TLSMemoryPool.h"
 #include "NetServer.h"
+#include "ChatServer.h"
+//에러 처리용 덤프와 로깅
+#include "Dump.h"
 
 #pragma comment (lib, "NetworkLibrary")
+//LOG
+#pragma region LOG
 
-class CChatServer : public CNetServer
-{
-	//accept 직후, IP filterinig 등의 목적
-	bool OnConnectionRequest(WCHAR* IP, DWORD Port) {
-		return true;
-	};
-	//return false; 시 클라이언트 거부.
-	//return true; 시 접속 허용
-	bool OnClientJoin(DWORD64 sessionID) {
-		return true;
-	};
-	bool OnClientLeave(DWORD64 sessionID) {
-		return true;
-	}
+#define LOG_LEVEL_DEBUG 0
+#define LOG_LEVEL_SYSTEM 1
+#define LOG_LEVEL_ERROR 2
 
-	//message 분석 역할
-	void OnRecv(DWORD64 sessionID, CPacket* packet) {
-	};
+inline void Log(WCHAR* str, int logLevel) {
+    wprintf(L"%s \n", str);
+}
 
-	void OnError(int error, const WCHAR* msg) {
-	};
+inline void ErrorLog(const WCHAR* str) {
+    FILE* fp;
+    WCHAR fileName[MAX_PATH];
+    SYSTEMTIME nowTime;
 
-};
+    GetLocalTime(&nowTime);
+    wsprintf(fileName, L"LOG_%d%02d%02d_%02d.%02d.%02d.txt",
+        nowTime.wYear, nowTime.wMonth, nowTime.wDay, nowTime.wHour, nowTime.wMinute, nowTime.wSecond);
 
-CChatServer g_ChatServer;
+    _wfopen_s(&fp, fileName, L"wt");
+    if (fp == NULL) return;
+
+    fwprintf_s(fp, str);
+
+    fclose(fp);
+}
+
+#define _LOG(LogLevel, fmt, ...)    \
+do{                                 \
+    if(g_logLevel <= LogLevel){     \
+        wsprintf(g_logBuf, fmt, ##__VA_ARGS__);  \
+        Log(g_logBuf, LogLevel);                 \
+    }                                            \
+}while(0)                                    
+
+int g_logLevel;
+WCHAR g_logBuf[1024];
+
+#pragma endregion
+
+ChatServer g_ChatServer;
 WCHAR IP[16] = L"127.0.0.1";
 
 int main()
