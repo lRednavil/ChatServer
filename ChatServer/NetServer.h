@@ -2,6 +2,7 @@
 struct SESSION;
 class CPacket;
 
+#include "LockFreeStack.h"
 
 class CNetServer
 {

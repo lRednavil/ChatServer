@@ -148,6 +148,7 @@
     <ClInclude Include="LockFreeStack.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="TLSMemoryPool.h" />
+    <ClInclude Include="CommonProtocol.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

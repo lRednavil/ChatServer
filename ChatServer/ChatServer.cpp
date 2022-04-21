@@ -1,31 +1,46 @@
 ﻿#include <iostream>
+#include <Windows.h>
 
-#include "NetServer.h"
 #include "LockFreeMemoryPool.h"
 #include "LockFreeQueue.h"
 #include "LockFreeStack.h"
 #include "TLSMemoryPool.h"
+#include "NetServer.h"
+
+#pragma comment (lib, "NetworkLibrary")
 
 class CChatServer : public CNetServer
 {
 	//accept 직후, IP filterinig 등의 목적
-	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
+	bool OnConnectionRequest(WCHAR* IP, DWORD Port) {
+		return true;
+	};
 	//return false; 시 클라이언트 거부.
 	//return true; 시 접속 허용
-	virtual bool OnClientJoin(DWORD64 sessionID) = 0;
-	virtual bool OnClientLeave(DWORD64 sessionID) = 0;
+	bool OnClientJoin(DWORD64 sessionID) {
+		return true;
+	};
+	bool OnClientLeave(DWORD64 sessionID) {
+		return true;
+	}
 
 	//message 분석 역할
-	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
+	void OnRecv(DWORD64 sessionID, CPacket* packet) {
+	};
 
-	virtual void OnError(int error, const WCHAR* msg) = 0;
+	void OnError(int error, const WCHAR* msg) {
+	};
 
 };
 
+CChatServer g_ChatServer;
+WCHAR IP[16] = L"127.0.0.1";
 
 int main()
 {
-    std::cout << "Hello World!\n";
+	g_ChatServer.Start(IP, 12001, 4, 4, true, 5000);
+
+	scanf_s("%s");
 }
 
 // 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴
