@@ -25,6 +25,9 @@ struct JOB {
 class ChatServer : public CNetServer
 {
 public:
+	ChatServer();
+	~ChatServer();
+
 	void Monitor();
 
 //virtual함수 영역
@@ -35,21 +38,13 @@ private:
 	};
 	//return false; 시 클라이언트 거부.
 	//return true; 시 접속 허용
-	bool OnClientJoin(DWORD64 sessionID) {
-		++totalAccept;
-		return true;
-	};
-	bool OnClientLeave(DWORD64 sessionID) {
-		return true;
-	}
+	bool OnClientJoin(DWORD64 sessionID);
+	bool OnClientLeave(DWORD64 sessionID);
 
 	//message 분석 역할
-	void OnRecv(DWORD64 sessionID, CPacket* packet) {
+	void OnRecv(DWORD64 sessionID, CPacket* packet);
 
-	};
-
-	void OnError(int error, const WCHAR* msg) {
-	};
+	void OnError(int error, const WCHAR* msg);
 
 //chatserver 전용 함수 영역
 
@@ -59,6 +54,7 @@ private:
 	DWORD64 totalSend = 0;
 	DWORD64 totalRecv = 0;
 
+	CLockFreeQueue<JOB> jobQ;
 	std::list<PLAYER> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 
 
