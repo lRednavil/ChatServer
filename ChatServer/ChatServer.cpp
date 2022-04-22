@@ -470,6 +470,9 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             }
         }
     }
+
+    //본인 포함 send로 packetRef 1 초과
+    PacketFree(packet);
 }
 
 void ChatServer::DisconnectProc(DWORD64 sessionID)
@@ -485,12 +488,12 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         return;
     }
     //sectorList에서 제거
-    //for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
-    //    if (*itr == sessionID) {
-    //        sectorList[player->sectorY][player->sectorX].erase(itr);
-    //        break;
-    //    }
-    //}
+    for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
+        if (*itr == sessionID) {
+            sectorList[player->sectorY][player->sectorX].erase(itr);
+            break;
+        }
+    }
 
     //playerMap에서 제거
     playerMap.erase(sessionID);
