@@ -14,6 +14,8 @@ struct PLAYER {
 
 	WORD SectorX;
 	WORD SectorY;
+
+	DWORD lastTime;
 };
 
 struct JOB {
@@ -47,7 +49,19 @@ private:
 	void OnError(int error, const WCHAR* msg);
 
 //chatserver 전용 함수 영역
+	static unsigned int __stdcall _UpdateThread(void* arg);
+	static unsigned int __stdcall _TimerThread(void* arg);
 
+	void Recv_Login(DWORD64 sessionID, CPacket* packet);
+	void Res_Login(DWORD64 sessionID, CPacket* packet);
+
+	void Recv_SectorMove(DWORD64 sessionID, CPacket* packet);
+	void Res_SectorMove(DWORD64 sessionID, CPacket* packet);
+
+	void Recv_Message(DWORD64 sessionID, CPacket* packet);
+	void Res_Message(DWORD64 sessionID, CPacket* packet);
+
+	void Recv_HeartBeat(DWORD64 sessionID, CPacket* packet);
 
 private:
 	DWORD64 totalAccept = 0;
@@ -56,8 +70,11 @@ private:
 
 	CLockFreeQueue<JOB> jobQ;
 	std::list<PLAYER> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
+	//player로 쓸지 player*일지 고민좀 합시다
+	std::unordered_map<INT64, PLAYER> playerMap;
 
-
-
+	//0 for update Thread, 1 for timer Thread
+	HANDLE hThreads[2];
+	bool isServerOn;
 };
 
