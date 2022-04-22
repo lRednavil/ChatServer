@@ -129,23 +129,50 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
 void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 {
     WORD type;
+    JOB job;
+
     *packet >> type;
+   
 
     switch (type) {
     case en_PACKET_CS_CHAT_REQ_LOGIN:
-        Recv_Login(sessionID, packet);
+    {
+        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job.sessionID = sessionID;
+        job.packet = packet;
+
+        jobQ.Enqueue(job);
+    }
         break;
 
-    case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-        Recv_SectorMove(sessionID, packet);
-        break;
+    case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE: 
+    {
+        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job.sessionID = sessionID;
+        job.packet = packet;
+
+        jobQ.Enqueue(job);
+    }
+    break;
 
     case en_PACKET_CS_CHAT_REQ_MESSAGE:
-        Recv_Message(sessionID, packet);
-        break;
+    {
+        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job.sessionID = sessionID;
+        job.packet = packet;
+
+        jobQ.Enqueue(job);
+    }
+    break;
 
     case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-        Recv_HeartBeat(sessionID, packet);
+    {
+        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job.sessionID = sessionID;
+        job.packet = packet;
+
+        jobQ.Enqueue(job);
+    }
         break;
 
     default:
@@ -161,6 +188,45 @@ void ChatServer::OnError(int error, const WCHAR* msg)
 
 unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 {
+    ChatServer* server = (ChatServer*)arg;
+    JOB job;
+
+    while (server->isServerOn) {
+        //쉬게 할 방법 추가 고민
+        if (server->jobQ.Dequeue(&job) == false) {
+            Sleep(0);
+        }
+
+        switch (job.type) {
+        case en_PACKET_CS_CHAT_REQ_LOGIN:
+        {
+            server->Recv_Login(job.sessionID, job.packet);
+        }
+        break;
+
+        case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+        {
+            server->Recv_SectorMove(job.sessionID, job.packet);
+        }
+        break;
+
+        case en_PACKET_CS_CHAT_REQ_MESSAGE:
+        {
+            server->Recv_Message(job.sessionID, job.packet);
+        }
+        break;
+
+        case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
+        {
+            server->Recv_HeartBeat(job.sessionID, job.packet);
+        }
+        break;
+        //작동 안할겁니다
+        default:
+            server->Disconnect(job.sessionID);
+        }
+    }
+
     return 0;
 }
 
@@ -171,31 +237,40 @@ unsigned int __stdcall ChatServer::_TimerThread(void* arg)
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
-   
+    JOB job;
+    job.type = en_PACKET_CS_CHAT_RES_LOGIN;
+    job.sessionID = sessionID;
+    job.packet = packet;
 }
 
 void ChatServer::Res_Login(DWORD64 sessionID, CPacket* packet)
 {
+
 }
 
 void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
+
 }
 
 void ChatServer::Res_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
+
 }
 
 void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 {
+
 }
 
 void ChatServer::Res_Message(DWORD64 sessionID, CPacket* packet)
 {
+
 }
 
 void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 {
+
 }
 
 int main()

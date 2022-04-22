@@ -52,6 +52,8 @@ private:
 	static unsigned int __stdcall _UpdateThread(void* arg);
 	static unsigned int __stdcall _TimerThread(void* arg);
 
+	//모든 Recv함수는 PacketFree할 것
+	//playerMap 삽입
 	void Recv_Login(DWORD64 sessionID, CPacket* packet);
 	void Res_Login(DWORD64 sessionID, CPacket* packet);
 
