@@ -57,7 +57,7 @@ private:
 	//모든 Recv함수는 PacketFree할 것
 	//playerMap 삽입
 	void Recv_Login(DWORD64 sessionID, CPacket* packet);
-	void Res_Login(INT64 accountNo, DWORD64 sessionID, bool isSuccess);
+	void Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess);
 
 	void Recv_SectorMove(DWORD64 sessionID, CPacket* packet);
 	void Res_SectorMove(PLAYER* player, DWORD64 sessionID);
