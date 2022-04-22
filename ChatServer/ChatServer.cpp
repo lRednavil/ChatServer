@@ -437,6 +437,7 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
     char cntY;
     char cntX;
 
+    DWORD64 targetID;
     std::list<DWORD64>::iterator itr;
 
     //find player
@@ -464,7 +465,8 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             //각 session에 sendpacket
             for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
                 ++totalSend;
-                SendPacket(*itr, packet);
+                targetID = *itr;
+                SendPacket(targetID, packet);
             }
         }
     }
