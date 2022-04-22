@@ -115,10 +115,15 @@ void ChatServer::Monitor()
     wprintf_s(L"Total Recv : %llu \n", totalRecv);
 }
 
+bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
+{
+    InterlockedIncrement(&totalAccept);
+	return true;
+}
+
 bool ChatServer::OnClientJoin(DWORD64 sessionID)
 {
     //임시로 무조건 승인중
-    InterlockedIncrement(&totalAccept);
     return true;
 }
 
@@ -221,13 +226,13 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 
         case en_PACKET_CS_CHAT_REQ_MESSAGE:
         {
-            //server->Recv_Message(job.sessionID, job.packet);
+            server->Recv_Message(job.sessionID, job.packet);
         }
         break;
 
         case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
         {
-            //server->Recv_HeartBeat(job.sessionID, job.packet);
+            server->Recv_HeartBeat(job.sessionID, job.packet);
         }
         break;
         case en_SERVER_DISCONNECT:
