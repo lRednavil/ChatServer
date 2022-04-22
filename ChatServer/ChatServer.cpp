@@ -153,7 +153,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE: 
     {
-        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job.type = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
         job.sessionID = sessionID;
         job.packet = packet;
 
@@ -163,7 +163,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_MESSAGE:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job.type = en_PACKET_CS_CHAT_REQ_MESSAGE;
         job.sessionID = sessionID;
         job.packet = packet;
 
@@ -173,7 +173,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job.type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
         job.sessionID = sessionID;
         job.packet = packet;
 
@@ -215,7 +215,7 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 
         case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
         {
-            //server->Recv_SectorMove(job.sessionID, job.packet);
+            server->Recv_SectorMove(job.sessionID, job.packet);
         }
         break;
 
@@ -250,7 +250,7 @@ unsigned int __stdcall ChatServer::_TimerThread(void* arg)
     while (server->isServerOn) {
         server->currentTime = timeGetTime();
         for (auto itr = server->playerMap.begin(); itr != server->playerMap.end(); ++itr) {
-            if (itr->second->lastTime - server->currentTime >= TIME_OUT) {
+            if (server->currentTime - itr->second->lastTime >= TIME_OUT) {
                 server->Disconnect(itr->first);
             }
         }
@@ -283,6 +283,9 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
         playerMap.insert({ sessionID, player });
+        //sector정보 초기화목적
+        player->sectorX = SECTOR_X_MAX;
+        player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
         player->lastTime = currentTime;
     }
@@ -331,10 +334,13 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 
     //oldSector 제거
     std::list<DWORD64>::iterator itr;
-    for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
-        if (*itr == sessionID) {
-            sectorList[oldSectorY][oldSectorX].erase(itr);
-            break;
+    if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX) {}
+    else {
+        for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
+            if (*itr == sessionID) {
+                sectorList[oldSectorY][oldSectorX].erase(itr);
+                break;
+            }
         }
     }
     //newSector 삽입
@@ -472,12 +478,12 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         return;
     }
     //sectorList에서 제거
-    for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
-        if (*itr == sessionID) {
-            sectorList[player->sectorY][player->sectorX].erase(itr);
-            break;
-        }
-    }
+    //for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
+    //    if (*itr == sessionID) {
+    //        sectorList[player->sectorY][player->sectorX].erase(itr);
+    //        break;
+    //    }
+    //}
 
     //playerMap에서 제거
     playerMap.erase(sessionID);
@@ -486,7 +492,7 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
 int main()
 {
     LogInit();
-	g_ChatServer.Start(IP, PORT, 1, 1, true, MAX_CONNECT);
+	g_ChatServer.Start(IP, PORT, 4, 4, true, MAX_CONNECT);
     g_ChatServer.ThreadInit();
 
     timeBeginPeriod(1);
