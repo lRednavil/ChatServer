@@ -237,7 +237,7 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
         break;
         case en_SERVER_DISCONNECT:
         {
-            //server->DisconnectProc(job.sessionID);
+            server->DisconnectProc(job.sessionID);
         }
             break;
         default:
