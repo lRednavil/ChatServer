@@ -11,9 +11,10 @@ struct PLAYER {
 	INT64 accountNo;
 	WCHAR ID[20];
 	WCHAR Nickname[20];
+	char sessionKey[64];
 
-	WORD SectorX;
-	WORD SectorY;
+	WORD sectorX;
+	WORD sectorY;
 
 	DWORD lastTime;
 };
@@ -55,25 +56,27 @@ private:
 	//모든 Recv함수는 PacketFree할 것
 	//playerMap 삽입
 	void Recv_Login(DWORD64 sessionID, CPacket* packet);
-	void Res_Login(DWORD64 sessionID, CPacket* packet);
+	void Res_Login(INT64 accountNo, DWORD64 sessionID, bool isSuccess);
 
 	void Recv_SectorMove(DWORD64 sessionID, CPacket* packet);
-	void Res_SectorMove(DWORD64 sessionID, CPacket* packet);
+	void Res_SectorMove(PLAYER* player, DWORD64 sessionID);
 
 	void Recv_Message(DWORD64 sessionID, CPacket* packet);
 	void Res_Message(DWORD64 sessionID, CPacket* packet);
 
 	void Recv_HeartBeat(DWORD64 sessionID, CPacket* packet);
 
+	void SendSectorAround();
 private:
 	DWORD64 totalAccept = 0;
 	DWORD64 totalSend = 0;
 	DWORD64 totalRecv = 0;
 
 	CLockFreeQueue<JOB> jobQ;
-	std::list<PLAYER> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
-	//player로 쓸지 player*일지 고민좀 합시다
-	std::unordered_map<INT64, PLAYER> playerMap;
+	std::list<PLAYER*> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
+	//sessionID기준 탐색
+	std::unordered_map<INT64, PLAYER*> playerMap;
+	DWORD currentTime;
 
 	//0 for update Thread, 1 for timer Thread
 	HANDLE hThreads[2];

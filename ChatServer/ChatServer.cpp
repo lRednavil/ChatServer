@@ -16,6 +16,7 @@
 #include "Dump.h"
 
 #pragma comment (lib, "NetworkLibrary")
+#pragma comment (lib, "Winmm")
 //LOG
 #pragma region LOG
 
@@ -89,6 +90,8 @@ do{                                 \
 #define PORT 12001
 #define MAX_CONNECT 5000
 
+#define TIME_OUT 40000
+
 ChatServer g_ChatServer;
 WCHAR IP[16] = L"127.0.0.1";
 
@@ -123,7 +126,7 @@ bool ChatServer::OnClientJoin(DWORD64 sessionID)
 
 bool ChatServer::OnClientLeave(DWORD64 sessionID)
 {
-    return false;
+    return true;
 }
 
 void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
@@ -221,7 +224,6 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
             server->Recv_HeartBeat(job.sessionID, job.packet);
         }
         break;
-        //작동 안할겁니다
         default:
             server->Disconnect(job.sessionID);
         }
@@ -232,30 +234,86 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 
 unsigned int __stdcall ChatServer::_TimerThread(void* arg)
 {
+    ChatServer* server = (ChatServer*)arg;
+    
+    while (server->isServerOn) {
+        server->currentTime = timeGetTime();
+        for (auto itr = server->playerMap.begin(); itr != server->playerMap.end(); ++itr) {
+            if (itr->second->lastTime - server->currentTime >= TIME_OUT) {
+                server->Disconnect(itr->first);
+            }
+        }
+
+        Sleep(1000);
+    }
+
     return 0;
+
 }
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
-    JOB job;
-    job.type = en_PACKET_CS_CHAT_RES_LOGIN;
-    job.sessionID = sessionID;
-    job.packet = packet;
+    //packet 추출
+    PLAYER* player = new PLAYER;
+    *packet >> player->accountNo;
+    packet->GetData((char*)player->ID, 40);
+    packet->GetData((char*)player->Nickname, 40);
+    packet->GetData(player->sessionKey, 64);
+
+    PacketFree(packet);
+    //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
+    if (playerMap.find(sessionID) != playerMap.end()) {
+        playerMap.insert({ sessionID, player });
+        Res_Login(player->accountNo, sessionID, true);
+        player->lastTime = currentTime;
+    }
+    else {
+        Res_Login(player->accountNo, sessionID, false);
+        Disconnect(sessionID);
+        return;
+    }
 }
 
-void ChatServer::Res_Login(DWORD64 sessionID, CPacket* packet)
+void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, bool isSuccess)
 {
+    CPacket* packet = PacketAlloc();
+    
+    *packet << (WORD)en_PACKET_SC_CHAT_RES_LOGIN << isSuccess << accountNo;
 
+    SendPacket(sessionID, packet);
 }
 
 void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
+    PLAYER* player;
+    
+    //find player
+    if (playerMap.find(sessionID) != playerMap.end()) {
+        player = playerMap[sessionID];
+    }
+    else {
+        PacketFree(packet);
+        Disconnect(sessionID);
+        return;
+    }
 
+    //accountNO처리 한번더 고민
+    *packet >> player->accountNo >> player->sectorX >> player->sectorY;
+
+    PacketFree(packet);
+
+    player->lastTime = currentTime;
+
+    Res_SectorMove(player, sessionID);
 }
 
-void ChatServer::Res_SectorMove(DWORD64 sessionID, CPacket* packet)
+void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 {
+    CPacket* packet = PacketAlloc();
 
+    *packet << (WORD)en_PACKET_SC_CHAT_RES_SECTOR_MOVE << player->accountNo << player->sectorX << player->sectorY;
+
+    SendPacket(sessionID, packet);
 }
 
 void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
@@ -270,13 +328,28 @@ void ChatServer::Res_Message(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 {
+    PLAYER* player;
 
+    PacketFree(packet);
+
+    //find player
+    if (playerMap.find(sessionID) != playerMap.end()) {
+        player = playerMap[sessionID];
+    }
+    else {
+        Disconnect(sessionID);
+        return;
+    }
+
+    player->lastTime = currentTime;
 }
 
 int main()
 {
     LogInit();
 	g_ChatServer.Start(IP, PORT, 4, 4, true, MAX_CONNECT);
+
+    timeBeginPeriod(1);
 
     for (;;) {
         g_ChatServer.Monitor();

@@ -43,7 +43,7 @@ enum en_PACKET_TYPE
 	//	}
 	//
 	//------------------------------------------------------------
-	en_PACKET_CS_CHAT_RES_LOGIN,
+	en_PACKET_SC_CHAT_RES_LOGIN,
 
 	//------------------------------------------------------------
 	// 채팅서버 섹터 이동 요청
@@ -71,7 +71,7 @@ enum en_PACKET_TYPE
 	//	}
 	//
 	//------------------------------------------------------------
-	en_PACKET_CS_CHAT_RES_SECTOR_MOVE,
+	en_PACKET_SC_CHAT_RES_SECTOR_MOVE,
 
 	//------------------------------------------------------------
 	// 채팅서버 채팅보내기 요청
@@ -102,7 +102,7 @@ enum en_PACKET_TYPE
 	//	}
 	//
 	//------------------------------------------------------------
-	en_PACKET_CS_CHAT_RES_MESSAGE,
+	en_PACKET_SC_CHAT_RES_MESSAGE,
 
 	//------------------------------------------------------------
 	// 하트비트
@@ -117,7 +117,8 @@ enum en_PACKET_TYPE
 	//------------------------------------------------------------	
 	en_PACKET_CS_CHAT_REQ_HEARTBEAT,
 
-
+	//update Thread에서 Disconnect처리하기 위한 서버 내 프로토콜
+	en_SERVER_DISCONNECT,
 
 };
 
