@@ -33,6 +33,7 @@ public:
 
 	void Monitor();
 
+	void ThreadInit();
 //virtual함수 영역
 private:
 	//accept 직후, IP filterinig 등의 목적
@@ -62,18 +63,22 @@ private:
 	void Res_SectorMove(PLAYER* player, DWORD64 sessionID);
 
 	void Recv_Message(DWORD64 sessionID, CPacket* packet);
-	void Res_Message(DWORD64 sessionID, CPacket* packet);
+	void Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len);
 
 	void Recv_HeartBeat(DWORD64 sessionID, CPacket* packet);
 
-	void SendSectorAround();
+	void SendSectorAround(DWORD64 sessionID, CPacket* packet);
+	void DisconnectProc(DWORD64 sessionID);
+
+
 private:
 	DWORD64 totalAccept = 0;
 	DWORD64 totalSend = 0;
 	DWORD64 totalRecv = 0;
 
 	CLockFreeQueue<JOB> jobQ;
-	std::list<PLAYER*> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
+	//sessionID기준 탐색
+	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
 	std::unordered_map<INT64, PLAYER*> playerMap;
 	DWORD currentTime;
