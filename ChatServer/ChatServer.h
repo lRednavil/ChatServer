@@ -73,6 +73,10 @@ private:
 	DWORD64 totalAccept = 0;
 	DWORD64 totalSend = 0;
 	DWORD64 totalRecv = 0;
+	//tps측정용 기억
+	DWORD64 lastAccept = 0;
+	DWORD64 lastSend = 0;
+	DWORD64 lastRecv = 0;
 
 	CLockFreeQueue<JOB> jobQ;
 	//sessionID기준 탐색

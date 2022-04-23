@@ -87,13 +87,13 @@ do{                                 \
 
 #pragma endregion
 
-#define PORT 12001
-#define MAX_CONNECT 5000
+#define PORT 11601
+#define MAX_CONNECT 10000
 
 #define TIME_OUT 40000
 
 ChatServer g_ChatServer;
-WCHAR IP[16] = L"127.0.0.1";
+WCHAR IP[16] = L"0.0.0.0";
 
 ChatServer::ChatServer()
 {
@@ -113,6 +113,14 @@ void ChatServer::Monitor()
     wprintf_s(L"Total Accept : %llu \n", totalAccept);
     wprintf_s(L"Total Send : %llu \n", totalSend);
     wprintf_s(L"Total Recv : %llu \n", totalRecv);
+    wprintf_s(L"=============================\n");
+    wprintf_s(L"Accept TPS : %llu \n", totalAccept - lastAccept);
+    wprintf_s(L"Send TPS : %llu \n", totalSend - lastSend);
+    wprintf_s(L"Recv TPS : %llu \n", totalRecv - lastRecv);
+
+    lastAccept = totalAccept;
+    lastSend = totalSend;
+    lastRecv = totalRecv;
 }
 
 bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
@@ -257,6 +265,7 @@ unsigned int __stdcall ChatServer::_TimerThread(void* arg)
         for (auto itr = server->playerMap.begin(); itr != server->playerMap.end(); ++itr) {
             if (server->currentTime - itr->second->lastTime >= TIME_OUT) {
                 server->Disconnect(itr->first);
+                server->OnError(-1, L"Time Out!!");
             }
         }
 
@@ -396,6 +405,8 @@ void ChatServer::Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len)
         return;
     }
 
+    player->lastTime = currentTime;
+
     packet = PacketAlloc();
 
     *packet << (WORD)en_PACKET_SC_CHAT_RES_MESSAGE << player->accountNo;
@@ -488,10 +499,13 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         return;
     }
     //sectorList에서 제거
-    for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
-        if (*itr == sessionID) {
-            sectorList[player->sectorY][player->sectorX].erase(itr);
-            break;
+    if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
+    else {
+        for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
+            if (*itr == sessionID) {
+                sectorList[player->sectorY][player->sectorX].erase(itr);
+                break;
+            }
         }
     }
 
