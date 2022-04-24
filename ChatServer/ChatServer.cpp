@@ -92,12 +92,13 @@ do{                                 \
 
 #define TIME_OUT 40000
 
+CDump dump;
 ChatServer g_ChatServer;
 WCHAR IP[16] = L"0.0.0.0";
 
 ChatServer::ChatServer()
 {
-
+    InitializeSRWLock(&playerMapLock);
 }
 
 ChatServer::~ChatServer()
@@ -247,7 +248,7 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
         {
             server->DisconnectProc(job.sessionID);
         }
-            break;
+        break;
         default:
             server->Disconnect(job.sessionID);
         }
@@ -262,12 +263,14 @@ unsigned int __stdcall ChatServer::_TimerThread(void* arg)
     
     while (server->isServerOn) {
         server->currentTime = timeGetTime();
+      //  AcquireSRWLockShared(&server->playerMapLock);
         for (auto itr = server->playerMap.begin(); itr != server->playerMap.end(); ++itr) {
             if (server->currentTime - itr->second->lastTime >= TIME_OUT) {
                 server->Disconnect(itr->first);
                 server->OnError(-1, L"Time Out!!");
             }
         }
+       // ReleaseSRWLockShared(&server->playerMapLock);
 
         Sleep(1000);
     }
@@ -278,10 +281,10 @@ unsigned int __stdcall ChatServer::_TimerThread(void* arg)
 
 void ChatServer::ThreadInit()
 {
+    isServerOn = true;
+
     hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, _UpdateThread, this, NULL, 0);
     hThreads[1] = (HANDLE)_beginthreadex(NULL, 0, _TimerThread, this, NULL, 0);
-
-    isServerOn = true;
 }
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
@@ -463,12 +466,13 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 
     for (cntY = -1; cntY <= 1; ++cntY) {
         sectorY = player->sectorY + cntY;
-        if (sectorY < 0 || sectorY >= SECTOR_Y_MAX)
+        //WORD이므로 -1 => 65535
+        if (sectorY >= SECTOR_Y_MAX)
             continue;
 
         for (cntX = -1; cntX <= 1; ++cntX) {
             sectorX = player->sectorX + cntX;
-            if (sectorX < 0 || sectorX >= SECTOR_X_MAX)
+            if (sectorX >= SECTOR_X_MAX)
                 continue;
 
             //packet addref처리
@@ -501,16 +505,22 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     //sectorList에서 제거
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
+        //AcquireSRWLockExclusive(&playerMapLock);
+
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
             }
         }
+
+        //ReleaseSRWLockExclusive(&playerMapLock);
     }
 
     //playerMap에서 제거
     playerMap.erase(sessionID);
+    
+    delete player;
 }
 
 int main()

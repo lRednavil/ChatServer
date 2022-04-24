@@ -88,5 +88,6 @@ private:
 	//0 for update Thread, 1 for timer Thread
 	HANDLE hThreads[2];
 	bool isServerOn;
+	SRWLOCK playerMapLock;
 };
 
