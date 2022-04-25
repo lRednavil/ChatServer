@@ -98,7 +98,7 @@ WCHAR IP[16] = L"0.0.0.0";
 
 ChatServer::ChatServer()
 {
-    InitializeSRWLock(&playerMapLock);
+    
 }
 
 ChatServer::~ChatServer()
@@ -108,30 +108,15 @@ ChatServer::~ChatServer()
     WaitForMultipleObjects(2, hThreads, true, INFINITE);
 }
 
-void ChatServer::Monitor()
-{
-    system("cls");
-    wprintf_s(L"Total Accept : %llu \n", totalAccept);
-    wprintf_s(L"Total Send : %llu \n", totalSend);
-    wprintf_s(L"Total Recv : %llu \n", totalRecv);
-    wprintf_s(L"=============================\n");
-    wprintf_s(L"Accept TPS : %llu \n", totalAccept - lastAccept);
-    wprintf_s(L"Send TPS : %llu \n", totalSend - lastSend);
-    wprintf_s(L"Recv TPS : %llu \n", totalRecv - lastRecv);
-
-    lastAccept = totalAccept;
-    lastSend = totalSend;
-    lastRecv = totalRecv;
-}
 
 bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
 {
-    InterlockedIncrement(&totalAccept);
 	return true;
 }
 
 bool ChatServer::OnClientJoin(DWORD64 sessionID)
 {
+    SetTimeOut(sessionID, TIME_OUT);
     //임시로 무조건 승인중
     return true;
 }
@@ -200,6 +185,16 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     }
 }
 
+void ChatServer::OnTimeOut(DWORD64 sessionID)
+{
+    JOB job;
+
+    job.type = en_SERVER_DISCONNECT;
+    job.sessionID = sessionID;
+    
+    jobQ.Enqueue(job);
+}
+
 void ChatServer::OnError(int error, const WCHAR* msg)
 {
     if (error != -1) {
@@ -220,8 +215,6 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
             continue;
         }
         
-        ++server->totalRecv;
-
         switch (job.type) {
         case en_PACKET_CS_CHAT_REQ_LOGIN:
         {
@@ -243,7 +236,9 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 
         case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
         {
-            server->Recv_HeartBeat(job.sessionID, job.packet);
+            //지금 당장은 함수 Call의 이유가 없음
+            //server->Recv_HeartBeat(job.sessionID, job.packet);
+            server->PacketFree(job.packet);
         }
         break;
         case en_SERVER_DISCONNECT:
@@ -261,22 +256,7 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 
 unsigned int __stdcall ChatServer::_TimerThread(void* arg)
 {
-    ChatServer* server = (ChatServer*)arg;
-    
-    while (server->isServerOn) {
-        server->currentTime = timeGetTime();
-        AcquireSRWLockShared(&server->playerMapLock);
-        for (auto itr = server->playerMap.begin(); itr != server->playerMap.end(); ++itr) {
-            if (server->currentTime - itr->second->lastTime >= TIME_OUT) {
-                server->Disconnect(itr->first);
-                server->OnError(-1, L"Time Out!!");
-            }
-        }
-        ReleaseSRWLockShared(&server->playerMapLock);
-
-        Sleep(1000);
-    }
-
+   
     return 0;
 
 }
@@ -305,8 +285,7 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
-        player->lastTime = currentTime;
-        //playermap에 삽입
+        //player sector map에 삽입
         playerMap.insert({ sessionID, player });
     }
     else {
@@ -322,7 +301,6 @@ void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
     
     *packet << (WORD)en_PACKET_SC_CHAT_RES_LOGIN << isSuccess << accountNo;
 
-    ++totalSend;
     SendPacket(sessionID, packet);
 }
 
@@ -350,8 +328,6 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 
     PacketFree(packet);
 
-    player->lastTime = currentTime;
-
     //oldSector 제거
     std::list<DWORD64>::iterator itr;
     if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX) {}
@@ -375,7 +351,6 @@ void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 
     *packet << (WORD)en_PACKET_SC_CHAT_RES_SECTOR_MOVE << player->accountNo << player->sectorX << player->sectorY;
 
-    ++totalSend;
     SendPacket(sessionID, packet);
 }
 
@@ -393,7 +368,6 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 
     PacketFree(packet);
 
-    ++totalSend;
     Res_Message(sessionID, msg, msgLen);
 }
 
@@ -410,8 +384,6 @@ void ChatServer::Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len)
         Disconnect(sessionID);
         return;
     }
-
-    player->lastTime = currentTime;
 
     packet = PacketAlloc();
 
@@ -443,7 +415,6 @@ void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
-    player->lastTime = currentTime;
 }
 
 void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
@@ -482,8 +453,8 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             packet->AddRef(sectorList[sectorY][sectorX].size());
             //각 session에 sendpacket
             for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                ++totalSend;
-                SendPacket(*itr, packet);
+                targetID = *itr;
+                SendPacket(targetID, packet);
             }
         }
     }
@@ -507,16 +478,12 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     //sectorList에서 제거
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
-        AcquireSRWLockExclusive(&playerMapLock);
-
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
             }
         }
-
-        ReleaseSRWLockExclusive(&playerMapLock);
     }
 
     //playerMap에서 제거
