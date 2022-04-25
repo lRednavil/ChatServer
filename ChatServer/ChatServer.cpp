@@ -202,7 +202,9 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::OnError(int error, const WCHAR* msg)
 {
-    if (error != -1) ErrorLog(error, msg);
+    if (error != -1) {
+        ErrorLog(error, msg);
+    }
     else ErrorLog(msg);
 }
 
@@ -304,7 +306,7 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
         player->lastTime = currentTime;
-        //player sector map에 삽입
+        //playermap에 삽입
         playerMap.insert({ sessionID, player });
     }
     else {
@@ -451,8 +453,8 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
     WORD sectorX;
     char cntY;
     char cntX;
-
-    DWORD64 targetID;
+    //디버그용
+    PLAYER* temp;
     std::list<DWORD64>::iterator itr;
 
     //find player
@@ -481,8 +483,7 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             //각 session에 sendpacket
             for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
                 ++totalSend;
-                targetID = *itr;
-                SendPacket(targetID, packet);
+                SendPacket(*itr, packet);
             }
         }
     }
