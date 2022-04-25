@@ -234,7 +234,9 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 
         case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
         {
-            server->Recv_HeartBeat(job.sessionID, job.packet);
+            //지금 당장은 함수 Call의 이유가 없음
+            //server->Recv_HeartBeat(job.sessionID, job.packet);
+            server->PacketFree(job.packet);
         }
         break;
         case en_SERVER_DISCONNECT:
