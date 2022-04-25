@@ -31,8 +31,6 @@ public:
 	ChatServer();
 	~ChatServer();
 
-	void Monitor();
-
 	void ThreadInit();
 //virtual함수 영역
 private:
@@ -45,6 +43,8 @@ private:
 
 	//message 분석 역할
 	void OnRecv(DWORD64 sessionID, CPacket* packet);
+	
+	void OnTimeOut(DWORD64 sessionID);
 
 	void OnError(int error, const WCHAR* msg);
 
@@ -70,24 +70,14 @@ private:
 
 
 private:
-	DWORD64 totalAccept = 0;
-	DWORD64 totalSend = 0;
-	DWORD64 totalRecv = 0;
-	//tps측정용 기억
-	DWORD64 lastAccept = 0;
-	DWORD64 lastSend = 0;
-	DWORD64 lastRecv = 0;
-
 	CLockFreeQueue<JOB> jobQ;
 	//sessionID기준 탐색
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
 	std::unordered_map<INT64, PLAYER*> playerMap;
-	DWORD currentTime;
 
 	//0 for update Thread, 1 for timer Thread
 	HANDLE hThreads[2];
 	bool isServerOn;
-	SRWLOCK playerMapLock;
 };
 
