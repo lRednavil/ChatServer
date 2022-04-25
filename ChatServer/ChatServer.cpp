@@ -263,14 +263,14 @@ unsigned int __stdcall ChatServer::_TimerThread(void* arg)
     
     while (server->isServerOn) {
         server->currentTime = timeGetTime();
-      //  AcquireSRWLockShared(&server->playerMapLock);
+        AcquireSRWLockShared(&server->playerMapLock);
         for (auto itr = server->playerMap.begin(); itr != server->playerMap.end(); ++itr) {
             if (server->currentTime - itr->second->lastTime >= TIME_OUT) {
                 server->Disconnect(itr->first);
                 server->OnError(-1, L"Time Out!!");
             }
         }
-       // ReleaseSRWLockShared(&server->playerMapLock);
+        ReleaseSRWLockShared(&server->playerMapLock);
 
         Sleep(1000);
     }
@@ -299,12 +299,13 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
     PacketFree(packet);
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
-        playerMap.insert({ sessionID, player });
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
         player->lastTime = currentTime;
+        //player sector map에 삽입
+        playerMap.insert({ sessionID, player });
     }
     else {
         Res_Login(player->accountNo, sessionID, 0);
@@ -505,7 +506,7 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     //sectorList에서 제거
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
-        //AcquireSRWLockExclusive(&playerMapLock);
+        AcquireSRWLockExclusive(&playerMapLock);
 
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
@@ -514,7 +515,7 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
             }
         }
 
-        //ReleaseSRWLockExclusive(&playerMapLock);
+        ReleaseSRWLockExclusive(&playerMapLock);
     }
 
     //playerMap에서 제거
