@@ -105,7 +105,7 @@ ChatServer::~ChatServer()
 {
     isServerOn = false;
 
-    WaitForMultipleObjects(2, hThreads, true, INFINITE);
+    WaitForSingleObject(hThreads, INFINITE);
 }
 
 
@@ -193,6 +193,7 @@ void ChatServer::OnTimeOut(DWORD64 sessionID)
     job.sessionID = sessionID;
     
     jobQ.Enqueue(job);
+    OnError(-1, L"Time Out!!");
 }
 
 void ChatServer::OnError(int error, const WCHAR* msg)
@@ -254,19 +255,11 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
     return 0;
 }
 
-unsigned int __stdcall ChatServer::_TimerThread(void* arg)
-{
-   
-    return 0;
-
-}
-
 void ChatServer::ThreadInit()
 {
     isServerOn = true;
 
-    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, _UpdateThread, this, NULL, 0);
-    hThreads[1] = (HANDLE)_beginthreadex(NULL, 0, _TimerThread, this, NULL, 0);
+    hThreads = (HANDLE)_beginthreadex(NULL, 0, _UpdateThread, this, NULL, 0);
 }
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
@@ -453,8 +446,7 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             packet->AddRef(sectorList[sectorY][sectorX].size());
             //각 session에 sendpacket
             for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                targetID = *itr;
-                SendPacket(targetID, packet);
+                SendPacket(*itr, packet);
             }
         }
     }

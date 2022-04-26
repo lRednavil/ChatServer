@@ -76,8 +76,8 @@ private:
 	//sessionID±âÁØ Å½»ö
 	std::unordered_map<INT64, PLAYER*> playerMap;
 
-	//0 for update Thread, 1 for timer Thread
-	HANDLE hThreads[2];
+	//0 for update Thread
+	HANDLE hThreads;
 	bool isServerOn;
 };
 
