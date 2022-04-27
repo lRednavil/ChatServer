@@ -96,6 +96,8 @@ CDump dump;
 ChatServer g_ChatServer;
 WCHAR IP[16] = L"0.0.0.0";
 
+CTLSMemoryPool<PLAYER> g_playerPool;
+
 ChatServer::ChatServer()
 {
     
@@ -265,7 +267,7 @@ void ChatServer::ThreadInit()
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
     //packet 추출
-    PLAYER* player = new PLAYER;
+    PLAYER* player = g_playerPool.Alloc();
     *packet >> player->accountNo;
     packet->GetData((char*)player->ID, 40);
     packet->GetData((char*)player->Nickname, 40);
@@ -481,7 +483,7 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     //playerMap에서 제거
     playerMap.erase(sessionID);
     
-    delete player;
+    g_playerPool.Free(player);
 }
 
 int main()
