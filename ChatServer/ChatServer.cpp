@@ -189,6 +189,8 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::OnTimeOut(DWORD64 sessionID)
 {
+    dump.Crash();
+
     JOB job;
 
     job.type = en_SERVER_DISCONNECT;
