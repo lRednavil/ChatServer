@@ -2,6 +2,9 @@
 struct SESSION;
 class CPacket;
 
+class CProcessMonitor;
+class CProcessorMonitor;
+
 
 class CNetServer
 {
@@ -99,6 +102,9 @@ private:
 	DWORD maxConnection;
 	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용
 	bool isServerOn;
+
+	CProcessMonitor* myMonitor;
+	CProcessorMonitor* totalMonitor;
 
 	//readonly
 	SOCKET listenSock;
