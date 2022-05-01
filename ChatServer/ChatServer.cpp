@@ -189,15 +189,13 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::OnTimeOut(DWORD64 sessionID)
 {
-    dump.Crash();
-
     JOB job;
 
     job.type = en_SERVER_DISCONNECT;
     job.sessionID = sessionID;
     
     jobQ.Enqueue(job);
-    OnError(-1, L"Time Out!!");
+    OnError(timeOutCnt++, L"Time Out!!");
 }
 
 void ChatServer::OnError(int error, const WCHAR* msg)
@@ -266,6 +264,43 @@ void ChatServer::ThreadInit()
     hThreads = (HANDLE)_beginthreadex(NULL, 0, _UpdateThread, this, NULL, 0);
 }
 
+void ChatServer::ContentsMonitor()
+{
+    wprintf_s(L"========= CONTENTS ========== \n");
+    wprintf_s(L"TimeOut : %llu || LogOut : %llu || Chat Recvd : %llu \n", timeOutCnt, logOutRecv, chatCnt);
+
+    //sector용
+    std::multiset<int>::iterator itr;
+    std::multiset<int>::reverse_iterator ritr;
+    int cnt;
+    int lim;
+    int idx = 0;
+
+    wprintf_s(L"Max Sectors : ");
+    lim = 10;
+	for (idx = 49; idx >= 0; --idx) {
+		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
+			wprintf_s(L"%d  ", idx);
+		}
+		lim -= sectorCnt[idx];
+        if (lim <= 0) break;
+	}
+	wprintf_s(L"\n");
+
+	wprintf_s(L"Min Sectors : ");
+	lim = 10;
+	for (idx = 0; idx < 50; ++idx) {
+		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
+			wprintf_s(L"%d  ", idx);
+		}
+		lim -= sectorCnt[idx];
+        if (lim <= 0) break;
+	}
+    wprintf_s(L"\n");
+
+
+}
+
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
     //packet 추출
@@ -327,16 +362,28 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 
     //oldSector 제거
     std::list<DWORD64>::iterator itr;
+    //monitor용
+    int listSize;
     if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX) {}
     else {
         for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
             if (*itr == sessionID) {
+                //mointor용
+                listSize = sectorList[oldSectorY][oldSectorX].size();
+                --sectorCnt[listSize];
+                ++sectorCnt[listSize - 1];
+
                 sectorList[oldSectorY][oldSectorX].erase(itr);
                 break;
             }
         }
     }
     //newSector 삽입
+    //mointor용
+    listSize = sectorList[player->sectorY][player->sectorX].size();
+    --sectorCnt[listSize];
+    ++sectorCnt[listSize + 1];
+
     sectorList[player->sectorY][player->sectorX].push_back(sessionID);
 
     Res_SectorMove(player, sessionID);
@@ -364,6 +411,15 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
     packet->GetData((char*)msg, msgLen);
 
     PacketFree(packet);
+
+    //컨텐츠 모니터링용
+    {
+        ++chatCnt;
+        WCHAR txt[1] = { L'=' };
+        if (wcscmp(msg, txt) == 0) {
+            ++logOutRecv;
+        }
+    }
 
     Res_Message(sessionID, msg, msgLen);
 }
@@ -472,10 +528,18 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         return;
     }
     //sectorList에서 제거
+
+    //mointor용
+    int listSize;
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
+                //mointor용
+                listSize = sectorList[player->sectorY][player->sectorX].size();
+                --sectorCnt[listSize];
+                ++sectorCnt[listSize - 1];
+
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
             }
@@ -497,7 +561,9 @@ int main()
     timeBeginPeriod(1);
 
     for (;;) {
+        //console화면 지워지니까 contentsMontior는 그냥 로그만 추가하세요
         g_ChatServer.Monitor();
+        g_ChatServer.ContentsMonitor();
         Sleep(1000);
     }
 }

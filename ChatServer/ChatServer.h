@@ -2,6 +2,7 @@
 
 #include <list>
 #include <unordered_map>
+#include <set>
 
 #define SECTOR_X_MAX 50
 #define SECTOR_Y_MAX 50
@@ -32,6 +33,9 @@ public:
 	~ChatServer();
 
 	void ThreadInit();
+	
+	void ContentsMonitor();
+
 //virtual함수 영역
 private:
 	//accept 직후, IP filterinig 등의 목적
@@ -75,6 +79,14 @@ private:
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
 	std::unordered_map<INT64, PLAYER*> playerMap;
+
+	DWORD64 timeOutCnt = 0;
+	//메세지에서 L'='수신 카운트
+	DWORD64 logOutRecv = 0;
+	DWORD64 chatCnt = 0;
+
+	int sectorCnt[50] = { 5000, };
+
 
 	//0 for update Thread
 	HANDLE hThreads;
