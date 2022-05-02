@@ -92,6 +92,8 @@ do{                                 \
 
 #define TIME_OUT 40000
 
+#define GetMapID(sessionID) (sessionID & (PLAYER_MAP_MAX - 1));
+
 CDump dump;
 ChatServer g_ChatServer;
 WCHAR IP[16] = L"0.0.0.0";
@@ -107,6 +109,10 @@ ChatServer::ChatServer()
         for (cntX = 0; cntX < SECTOR_X_MAX; ++cntX) {
             InitializeSRWLock(&sectorLock[cntY][cntX]);
         }
+    }
+
+    for (cntX = 0; cntX < PLAYER_MAP_MAX; ++cntX) {
+        InitializeSRWLock(&playerMapLock[cntX]);
     }
 }
 
@@ -245,15 +251,19 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
     packet->GetData((char*)player->Nickname, 40);
     packet->GetData(player->sessionKey, 64);
 
+    int mapID = GetMapID(sessionID);
+
     PacketFree(packet);
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
-    if (playerMap.find(sessionID) == playerMap.end()) {
+    if (playerMap[mapID].find(sessionID) == playerMap[mapID].end()) {
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
         //player sector map에 삽입
-        playerMap.insert({ sessionID, player });
+        AcquireSRWLockExclusive(&playerMapLock[mapID]);
+        playerMap[mapID].insert({ sessionID, player });
+        ReleaseSRWLockExclusive(&playerMapLock[mapID]);
     }
     else {
         Res_Login(player->accountNo, sessionID, 0);
@@ -276,12 +286,17 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     PLAYER* player;
     WORD oldSectorX;
     WORD oldSectorY;
+    
+    int mapID = GetMapID(sessionID);
 
-    //find player
-    if (playerMap.find(sessionID) != playerMap.end()) {
-        player = playerMap[sessionID];
+    //find player        
+    AcquireSRWLockShared(&playerMapLock[mapID]);
+    if (playerMap[mapID].find(sessionID) != playerMap[mapID].end()) {
+        player = playerMap[mapID][sessionID];
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
     }
     else {
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
         PacketFree(packet);
         Disconnect(sessionID);
         return;
@@ -363,11 +378,16 @@ void ChatServer::Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len)
     PLAYER* player;
     CPacket* packet;
 
+    int mapID = GetMapID(sessionID);
+
     //find player
-    if (playerMap.find(sessionID) != playerMap.end()) {
-        player = playerMap[sessionID];
+    AcquireSRWLockShared(&playerMapLock[mapID]);
+    if (playerMap[mapID].find(sessionID) != playerMap[mapID].end()) {
+        player = playerMap[mapID][sessionID];
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
     }
     else {
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
         Disconnect(sessionID);
         return;
     }
@@ -393,11 +413,16 @@ void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 
     PacketFree(packet);
 
+    int mapID = GetMapID(sessionID);
+
     //find player
-    if (playerMap.find(sessionID) != playerMap.end()) {
-        player = playerMap[sessionID];
+    AcquireSRWLockShared(&playerMapLock[mapID]);
+    if (playerMap[mapID].find(sessionID) != playerMap[mapID].end()) {
+        player = playerMap[mapID][sessionID];
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
     }
     else {
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
         Disconnect(sessionID);
         return;
     }
@@ -415,11 +440,16 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
     PLAYER* temp;
     std::list<DWORD64>::iterator itr;
 
+    int mapID = GetMapID(sessionID);
+
     //find player
-    if (playerMap.find(sessionID) != playerMap.end()) {
-        player = playerMap[sessionID];
+    AcquireSRWLockShared(&playerMapLock[mapID]);
+    if (playerMap[mapID].find(sessionID) != playerMap[mapID].end()) {
+        player = playerMap[mapID][sessionID];
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
     }
     else {
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
         PacketFree(packet);
         Disconnect(sessionID);
         return;
@@ -454,11 +484,16 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     PLAYER* player;
     std::list<DWORD64>::iterator itr;
 
+    int mapID = GetMapID(sessionID);
+
     //find player
-    if (playerMap.find(sessionID) != playerMap.end()) {
-        player = playerMap[sessionID];
+    AcquireSRWLockShared(&playerMapLock[mapID]);
+    if (playerMap[mapID].find(sessionID) != playerMap[mapID].end()) {
+        player = playerMap[mapID][sessionID];
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
     }
     else {
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
         return;
     }
     //sectorList에서 제거
@@ -467,6 +502,7 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     int listSize;
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
+        AcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
                 //mointor용
@@ -478,11 +514,14 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
                 break;
             }
         }
+        ReleaseSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
     }
 
-    //playerMap에서 제거
-    playerMap.erase(sessionID);
-    
+    //playerMap[mapID]에서 제거
+    AcquireSRWLockExclusive(&playerMapLock[mapID]);
+    playerMap[mapID].erase(sessionID);
+    ReleaseSRWLockExclusive(&playerMapLock[mapID]);
+
     g_playerPool.Free(player);
 }
 

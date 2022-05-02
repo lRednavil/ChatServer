@@ -6,6 +6,7 @@
 
 #define SECTOR_X_MAX 50
 #define SECTOR_Y_MAX 50
+#define PLAYER_MAP_MAX 4
 
 //player랑 job은 별도 헤더로 빠질수도..?
 struct PLAYER {
@@ -75,7 +76,9 @@ private:
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	SRWLOCK sectorLock[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
-	std::unordered_map<INT64, PLAYER*> playerMap[4];
+	std::unordered_map<INT64, PLAYER*> playerMap[PLAYER_MAP_MAX];
+	SRWLOCK playerMapLock[PLAYER_MAP_MAX];
+
 
 	DWORD64 timeOutCnt = 0;
 	//메세지에서 L'='수신 카운트
