@@ -409,14 +409,14 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
     msg = new WCHAR[msgLen / 2];
 
     packet->GetData((char*)msg, msgLen);
-
+    
     PacketFree(packet);
 
     //컨텐츠 모니터링용
     {
         ++chatCnt;
-        WCHAR txt[1] = { L'=' };
-        if (wcscmp(msg, txt) == 0) {
+        msg[msgLen / 2] = L'\0';
+        if (wcscmp(msg, L"=") == 0) {
             ++logOutRecv;
         }
     }
