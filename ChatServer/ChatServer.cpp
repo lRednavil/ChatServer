@@ -317,6 +317,18 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     std::list<DWORD64>::iterator itr;
     //monitor용
     int listSize;
+    
+    for (;;) {
+        if (TryAcquireSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]) == true) {
+            if (TryAcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]) == false) {
+                ReleaseSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]);
+            }
+            else {
+                break;
+            }
+        }
+    }
+
     if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX) {}
     else {
         for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
@@ -473,8 +485,8 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
         if (TryAcquireSRWLockShared(&sectorLock[sectorY][sectorX]) == false) 
         {
             for (inCnt = 0; inCnt < cnt; ++inCnt) {
-                sectorX = player->sectorX + deltaSectorX[cnt];
-                sectorY = player->sectorY + deltaSectorY[cnt];
+                sectorX = player->sectorX + deltaSectorX[inCnt];
+                sectorY = player->sectorY + deltaSectorY[inCnt];
 
                 if (sectorX >= SECTOR_X_MAX)
                     continue;
