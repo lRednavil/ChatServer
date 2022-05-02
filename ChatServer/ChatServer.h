@@ -73,8 +73,9 @@ private:
 	CLockFreeQueue<JOB> jobQ;
 	//sessionID기준 탐색
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
+	SRWLOCK sectorLock[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
-	std::unordered_map<INT64, PLAYER*> playerMap;
+	std::unordered_map<INT64, PLAYER*> playerMap[4];
 
 	DWORD64 timeOutCnt = 0;
 	//메세지에서 L'='수신 카운트

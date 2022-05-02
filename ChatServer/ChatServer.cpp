@@ -100,14 +100,19 @@ CTLSMemoryPool<PLAYER> g_playerPool;
 
 ChatServer::ChatServer()
 {
-    
+    int cntX;
+    int cntY;
+
+    for (cntY = 0; cntY < SECTOR_Y_MAX; ++cntY) {
+        for (cntX = 0; cntX < SECTOR_X_MAX; ++cntX) {
+            InitializeSRWLock(&sectorLock[cntY][cntX]);
+        }
+    }
 }
 
 ChatServer::~ChatServer()
 {
     isServerOn = false;
-
-    WaitForSingleObject(hThreads, INFINITE);
 }
 
 
