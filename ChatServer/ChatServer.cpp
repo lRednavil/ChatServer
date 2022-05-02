@@ -137,48 +137,33 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
 void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 {
     WORD type;
-    JOB job;
 
     *packet >> type;
    
     switch (type) {
     case en_PACKET_CS_CHAT_REQ_LOGIN:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
-        job.sessionID = sessionID;
-        job.packet = packet;
-
-        jobQ.Enqueue(job);
+        Recv_Login(sessionID, packet);
     }
         break;
 
     case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE: 
     {
-        job.type = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
-        job.sessionID = sessionID;
-        job.packet = packet;
-
-        jobQ.Enqueue(job);
+        Recv_SectorMove(sessionID, packet);
     }
     break;
 
     case en_PACKET_CS_CHAT_REQ_MESSAGE:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_MESSAGE;
-        job.sessionID = sessionID;
-        job.packet = packet;
-
-        jobQ.Enqueue(job);
+        Recv_Message(sessionID, packet);
     }
     break;
 
     case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
-        job.sessionID = sessionID;
-        job.packet = packet;
-
-        jobQ.Enqueue(job);
+        //지금 당장은 함수 Call의 이유가 없음
+        //server->Recv_HeartBeat(job.sessionID, job.packet);
+        PacketFree(packet);
     }
         break;
 
@@ -206,62 +191,9 @@ void ChatServer::OnError(int error, const WCHAR* msg)
     else ErrorLog(msg);
 }
 
-unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
-{
-    ChatServer* server = (ChatServer*)arg;
-    JOB job;
-
-    while (server->isServerOn) {
-        //쉬게 할 방법 추가 고민
-        if (server->jobQ.Dequeue(&job) == false) {
-            Sleep(0);
-            continue;
-        }
-        
-        switch (job.type) {
-        case en_PACKET_CS_CHAT_REQ_LOGIN:
-        {
-            server->Recv_Login(job.sessionID, job.packet);
-        }
-        break;
-
-        case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-        {
-            server->Recv_SectorMove(job.sessionID, job.packet);
-        }
-        break;
-
-        case en_PACKET_CS_CHAT_REQ_MESSAGE:
-        {
-            server->Recv_Message(job.sessionID, job.packet);
-        }
-        break;
-
-        case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-        {
-            //지금 당장은 함수 Call의 이유가 없음
-            //server->Recv_HeartBeat(job.sessionID, job.packet);
-            server->PacketFree(job.packet);
-        }
-        break;
-        case en_SERVER_DISCONNECT:
-        {
-            server->DisconnectProc(job.sessionID);
-        }
-        break;
-        default:
-            server->Disconnect(job.sessionID);
-        }
-    }
-
-    return 0;
-}
-
 void ChatServer::ThreadInit()
 {
     isServerOn = true;
-
-    hThreads = (HANDLE)_beginthreadex(NULL, 0, _UpdateThread, this, NULL, 0);
 }
 
 void ChatServer::ContentsMonitor()

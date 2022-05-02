@@ -52,10 +52,6 @@ private:
 
 	void OnError(int error, const WCHAR* msg);
 
-//chatserver 전용 함수 영역
-	static unsigned int __stdcall _UpdateThread(void* arg);
-	static unsigned int __stdcall _TimerThread(void* arg);
-
 	//모든 Recv함수는 PacketFree할 것
 	//playerMap 삽입
 	void Recv_Login(DWORD64 sessionID, CPacket* packet);
@@ -87,9 +83,6 @@ private:
 
 	int sectorCnt[50] = { 2500, };
 
-
-	//0 for update Thread
-	HANDLE hThreads;
 	bool isServerOn;
 };
 
