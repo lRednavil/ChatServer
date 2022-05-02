@@ -100,6 +100,9 @@ WCHAR IP[16] = L"0.0.0.0";
 
 CTLSMemoryPool<PLAYER> g_playerPool;
 
+WORD deltaSectorX[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
+WORD deltaSectorY[9] = { -1, -1, -1, 0, 0, 0, 1, 1, 1 };
+
 ChatServer::ChatServer()
 {
     int cntX;
@@ -364,9 +367,9 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 
     //컨텐츠 모니터링용
     {
-        ++chatCnt;
+        InterlockedIncrement64((__int64*)&chatCnt);
         if (msg[0] == L'=') {
-            ++logOutRecv;
+            InterlockedIncrement64((__int64*)&logOutRecv);
         }
     }
 
@@ -436,6 +439,8 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
     WORD sectorX;
     char cntY;
     char cntX;
+    char cnt;
+    char inCnt;
     //디버그용
     PLAYER* temp;
     std::list<DWORD64>::iterator itr;
@@ -455,24 +460,64 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
-    for (cntY = -1; cntY <= 1; ++cntY) {
-        sectorY = player->sectorY + cntY;
-        //WORD이므로 -1 => 65535
+    //acquireLock구간
+    for (cnt = 0; cnt < 9; ++cnt) {
+        sectorX = player->sectorX + deltaSectorX[cnt];
+        sectorY = player->sectorY + deltaSectorY[cnt];
+
+        if (sectorX >= SECTOR_X_MAX)
+            continue;
         if (sectorY >= SECTOR_Y_MAX)
             continue;
 
-        for (cntX = -1; cntX <= 1; ++cntX) {
-            sectorX = player->sectorX + cntX;
-            if (sectorX >= SECTOR_X_MAX)
-                continue;
+        if (TryAcquireSRWLockShared(&sectorLock[sectorY][sectorX]) == false) 
+        {
+            for (inCnt = 0; inCnt < cnt; ++inCnt) {
+                sectorX = player->sectorX + deltaSectorX[cnt];
+                sectorY = player->sectorY + deltaSectorY[cnt];
 
-            //packet addref처리
-            packet->AddRef(sectorList[sectorY][sectorX].size());
-            //각 session에 sendpacket
-            for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                SendPacket(*itr, packet);
+                if (sectorX >= SECTOR_X_MAX)
+                    continue;
+                if (sectorY >= SECTOR_Y_MAX)
+                    continue;
+                
+                ReleaseSRWLockShared(&sectorLock[sectorY][sectorX]);
             }
+            cnt = -1;
         }
+    }
+
+
+    //SendPacket 구간
+    for (cnt = 0; cnt < 9; ++cnt) {
+        sectorX = player->sectorX + deltaSectorX[cnt];
+        sectorY = player->sectorY + deltaSectorY[cnt];
+
+        if (sectorX >= SECTOR_X_MAX)
+            continue;
+        if (sectorY >= SECTOR_Y_MAX)
+            continue;
+
+        //packet addref처리
+        packet->AddRef(sectorList[sectorY][sectorX].size());
+        //각 session에 sendpacket
+        for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
+            SendPacket(*itr, packet);
+        }
+    }
+
+
+    //release Lock 구간
+    for (cnt = 0; cnt < 9; ++cnt) {
+        sectorX = player->sectorX + deltaSectorX[cnt];
+        sectorY = player->sectorY + deltaSectorY[cnt];
+
+        if (sectorX >= SECTOR_X_MAX)
+            continue;
+        if (sectorY >= SECTOR_Y_MAX)
+            continue;
+
+        ReleaseSRWLockShared(&sectorLock[sectorY][sectorX]);
     }
 
     //본인 포함 send로 packetRef 1 초과
