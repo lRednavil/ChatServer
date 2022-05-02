@@ -270,8 +270,6 @@ void ChatServer::ContentsMonitor()
     wprintf_s(L"TimeOut : %llu || LogOut : %llu || Chat Recvd : %llu \n", timeOutCnt, logOutRecv, chatCnt);
 
     //sector용
-    std::multiset<int>::iterator itr;
-    std::multiset<int>::reverse_iterator ritr;
     int cnt;
     int lim;
     int idx = 0;
