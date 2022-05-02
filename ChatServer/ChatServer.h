@@ -85,7 +85,7 @@ private:
 	DWORD64 logOutRecv = 0;
 	DWORD64 chatCnt = 0;
 
-	int sectorCnt[50] = { 5000, };
+	int sectorCnt[50] = { 2500, };
 
 
 	//0 for update Thread
