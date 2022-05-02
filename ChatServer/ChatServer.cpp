@@ -202,32 +202,30 @@ void ChatServer::ContentsMonitor()
     wprintf_s(L"TimeOut : %llu || LogOut : %llu || Chat Recvd : %llu \n", timeOutCnt, logOutRecv, chatCnt);
 
     //sector용
-    std::multiset<int>::iterator itr;
-    std::multiset<int>::reverse_iterator ritr;
     int cnt;
     int lim;
     int idx = 0;
 
     wprintf_s(L"Max Sectors : ");
     lim = 10;
-	for (idx = 49; idx >= 0; --idx) {
-		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
-			wprintf_s(L"%d  ", idx);
-		}
-		lim -= sectorCnt[idx];
+    for (idx = 49; idx >= 0; --idx) {
+        for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
+            wprintf_s(L"%d  ", idx);
+        }
+        lim -= sectorCnt[idx];
         if (lim <= 0) break;
-	}
-	wprintf_s(L"\n");
+    }
+    wprintf_s(L"\n");
 
-	wprintf_s(L"Min Sectors : ");
-	lim = 10;
-	for (idx = 0; idx < 50; ++idx) {
-		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
-			wprintf_s(L"%d  ", idx);
-		}
-		lim -= sectorCnt[idx];
+    wprintf_s(L"Min Sectors : ");
+    lim = 10;
+    for (idx = 0; idx < 50; ++idx) {
+        for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
+            wprintf_s(L"%d  ", idx);
+        }
+        lim -= sectorCnt[idx];
         if (lim <= 0) break;
-	}
+    }
     wprintf_s(L"\n");
 
 
