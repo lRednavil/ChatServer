@@ -415,8 +415,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
     //컨텐츠 모니터링용
     {
         ++chatCnt;
-        msg[msgLen / 2] = L'\0';
-        if (wcscmp(msg, L"=") == 0) {
+        if (msg[0] == L'=') {
             ++logOutRecv;
         }
     }
