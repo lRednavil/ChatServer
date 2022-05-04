@@ -248,21 +248,21 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 
     PacketFree(packet);
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
+    AcquireSRWLockExclusive(&playerMapLock[mapID]);
     if (playerMap[mapID].find(sessionID) == playerMap[mapID].end()) {
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
         //player sector map에 삽입
-        AcquireSRWLockExclusive(&playerMapLock[mapID]);
         playerMap[mapID].insert({ sessionID, player });
-        ReleaseSRWLockExclusive(&playerMapLock[mapID]);
     }
     else {
         Res_Login(player->accountNo, sessionID, 0);
         Disconnect(sessionID);
-        return;
     }
+    ReleaseSRWLockExclusive(&playerMapLock[mapID]);
+
 }
 
 void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
