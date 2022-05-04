@@ -139,11 +139,7 @@ bool ChatServer::OnClientJoin(DWORD64 sessionID)
 
 bool ChatServer::OnClientLeave(DWORD64 sessionID)
 {
-    JOB job;
-    job.type = en_SERVER_DISCONNECT;
-    job.sessionID = sessionID;
-    
-    jobQ.Enqueue(job);
+    DisconnectProc(sessionID);
 
     return true;
 }
@@ -188,13 +184,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::OnTimeOut(DWORD64 sessionID)
 {
-    JOB job;
-
-    job.type = en_SERVER_DISCONNECT;
-    job.sessionID = sessionID;
-    
-    jobQ.Enqueue(job);
-    OnError(timeOutCnt++, L"Time Out!!");
+    DisconnectProc(sessionID);
 }
 
 void ChatServer::OnError(int error, const WCHAR* msg)
@@ -318,38 +308,51 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     //monitor용
     int listSize;
     
-    for (;;) {
-        if (TryAcquireSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]) == true) {
-            if (TryAcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]) == false) {
-                ReleaseSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]);
-            }
-            else {
-                break;
-            }
+    if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX)
+    {
+        AcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
+        goto NEW_SECTOR;
+    }
+    else if (oldSectorY == player->sectorY && oldSectorX == player->sectorX) {
+        Res_SectorMove(player, sessionID);
+        return;
+    }
+    else
+    {
+        for (;;) {
+            if (TryAcquireSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]) == false) continue;
+
+			if (TryAcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]) == false) {
+				ReleaseSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]);
+			}
+			else {
+				break;
+			}
         }
     }
 
-    if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX) {}
-    else {
-        for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
-            if (*itr == sessionID) {
-                //mointor용
-                listSize = sectorList[oldSectorY][oldSectorX].size();
-                --sectorCnt[listSize];
-                ++sectorCnt[listSize - 1];
+	for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
+		if (*itr == sessionID) {
+			//mointor용
+			listSize = sectorList[oldSectorY][oldSectorX].size();
+			--sectorCnt[listSize];
+			++sectorCnt[listSize - 1];
 
-                sectorList[oldSectorY][oldSectorX].erase(itr);
-                break;
-            }
-        }
-    }
+			sectorList[oldSectorY][oldSectorX].erase(itr);
+			break;
+		}
+	}
+    ReleaseSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]);
+    
     //newSector 삽입
     //mointor용
+    NEW_SECTOR:
     listSize = sectorList[player->sectorY][player->sectorX].size();
     --sectorCnt[listSize];
     ++sectorCnt[listSize + 1];
 
     sectorList[player->sectorY][player->sectorX].push_back(sessionID);
+    ReleaseSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
 
     Res_SectorMove(player, sessionID);
 }

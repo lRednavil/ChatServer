@@ -21,12 +21,6 @@ struct PLAYER {
 	DWORD lastTime;
 };
 
-struct JOB {
-	BYTE type;
-	DWORD64 sessionID;
-	CPacket* packet;
-};
-
 class ChatServer : public CNetServer
 {
 public:
@@ -71,7 +65,6 @@ private:
 
 
 private:
-	CLockFreeQueue<JOB> jobQ;
 	//sessionID±âÁØ Å½»ö
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	SRWLOCK sectorLock[SECTOR_Y_MAX][SECTOR_X_MAX];
