@@ -476,7 +476,7 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
     }
 
     //acquireLock구간
-    for (cnt = 0; cnt < 9; ++cnt) {
+     for (cnt = 0; cnt < 9; ++cnt) {
         sectorX = player->sectorX + deltaSectorX[cnt];
         sectorY = player->sectorY + deltaSectorY[cnt];
 
