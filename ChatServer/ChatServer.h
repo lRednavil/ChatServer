@@ -2,6 +2,7 @@
 
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 
 #define SECTOR_X_MAX 50
@@ -18,6 +19,7 @@ struct PLAYER {
 	WORD sectorY;
 
 	DWORD lastTime;
+	DWORD lastAct;
 };
 
 struct JOB {
@@ -78,6 +80,7 @@ private:
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
 	std::unordered_map<INT64, PLAYER*> playerMap;
+	std::unordered_set<INT64> accountNoSet;
 
 	DWORD64 timeOutCnt = 0;
 	//메세지에서 L'='수신 카운트

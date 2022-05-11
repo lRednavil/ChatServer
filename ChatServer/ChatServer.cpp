@@ -183,6 +183,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
         break;
 
     default:
+        OnError(-1, L"Packet Type Error");
         Disconnect(sessionID);
     }
 }
@@ -308,15 +309,24 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
     packet->GetData((char*)player->Nickname, 40);
     packet->GetData(player->sessionKey, 64);
 
+    player->lastAct = en_PACKET_CS_CHAT_REQ_LOGIN;
+
     PacketFree(packet);
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
+        if (accountNoSet.find(player->accountNo) != accountNoSet.end()) {
+            Res_Login(player->accountNo, sessionID, 0);
+            Disconnect(sessionID);
+            return;
+        }
+
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
         //player sector map에 삽입
         playerMap.insert({ sessionID, player });
+        accountNoSet.insert(player->accountNo);
     }
     else {
         Res_Login(player->accountNo, sessionID, 0);
@@ -350,6 +360,9 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
+
+    player->lastAct = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
+
 
     //accountNO처리 한번더 고민
     *packet >> accountNo >> newSectorX >> newSectorY;
@@ -427,10 +440,19 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
+
+    player->lastAct = en_PACKET_CS_CHAT_REQ_MESSAGE;
+
     *packet >> accountNo >> msgLen;
 
     //contents방어
     if (player->accountNo != accountNo) {
+        PacketFree(packet);
+        Disconnect(sessionID);
+        return;
+    }
+    if (player->sectorX == SECTOR_X_MAX || player->sectorY == SECTOR_Y_MAX) {
+        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
@@ -447,7 +469,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         if (msg[0] == L'=') {
             ++logOutRecv;
         }
-    }
+    }   
 
     Res_Message(sessionID, msg, msgLen);
 }
@@ -574,6 +596,7 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         }
     }
 
+    accountNoSet.erase(player->accountNo);
     //playerMap에서 제거
     playerMap.erase(sessionID);
     
