@@ -337,8 +337,9 @@ void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
 void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
     PLAYER* player;
-    WORD oldSectorX;
-    WORD oldSectorY;
+    INT64 accountNo;
+    WORD newSectorX;
+    WORD newSectorY;
 
     //find player
     if (playerMap.find(sessionID) != playerMap.end()) {
@@ -350,39 +351,52 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
-    oldSectorX = player->sectorX;
-    oldSectorY = player->sectorY;
-
     //accountNO처리 한번더 고민
-    *packet >> player->accountNo >> player->sectorX >> player->sectorY;
+    *packet >> accountNo >> newSectorX >> newSectorY;
 
     PacketFree(packet);
+    
+    //contents방어
+    if (player->accountNo != accountNo) {
+        Disconnect(sessionID);
+        return;
+    }
 
     //oldSector 제거
     std::list<DWORD64>::iterator itr;
     //monitor용
     int listSize;
-    if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX) {}
+    if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
-        for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
+        for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
                 //mointor용
-                listSize = sectorList[oldSectorY][oldSectorX].size();
+                listSize = sectorList[player->sectorY][player->sectorX].size();
                 --sectorCnt[listSize];
                 ++sectorCnt[listSize - 1];
 
-                sectorList[oldSectorY][oldSectorX].erase(itr);
+                sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
             }
         }
     }
     //newSector 삽입
+    //contents 방어
+    if (newSectorX >= SECTOR_X_MAX || newSectorY >= SECTOR_Y_MAX)
+    {
+        Disconnect(sessionID);
+        return;
+    }
+    
     //mointor용
-    listSize = sectorList[player->sectorY][player->sectorX].size();
+    listSize = sectorList[newSectorY][newSectorX].size();
     --sectorCnt[listSize];
     ++sectorCnt[listSize + 1];
 
-    sectorList[player->sectorY][player->sectorX].push_back(sessionID);
+    sectorList[newSectorY][newSectorX].push_back(sessionID);
+
+    player->sectorX = newSectorX;
+    player->sectorY = newSectorY;
 
     Res_SectorMove(player, sessionID);
 }
@@ -398,11 +412,28 @@ void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 
 void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 {
+    PLAYER* player;
     INT64 accountNo;
     WORD msgLen;
     WCHAR* msg;
 
+    //find player
+    if (playerMap.find(sessionID) != playerMap.end()) {
+        player = playerMap[sessionID];
+    }
+    else {
+        PacketFree(packet);
+        Disconnect(sessionID);
+        return;
+    }
+
     *packet >> accountNo >> msgLen;
+
+    //contents방어
+    if (player->accountNo != accountNo) {
+        Disconnect(sessionID);
+        return;
+    }
 
     msg = new WCHAR[msgLen / 2];
 
@@ -528,7 +559,7 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
 
     //mointor용
     int listSize;
-    if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
+    if (player->sectorY >= SECTOR_Y_MAX || player->sectorX >= SECTOR_X_MAX) {}
     else {
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
