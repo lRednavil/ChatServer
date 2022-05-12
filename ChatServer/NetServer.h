@@ -1,10 +1,8 @@
 #pragma once
 struct SESSION;
 class CPacket;
-
 class CProcessMonitor;
 class CProcessorMonitor;
-
 
 class CNetServer
 {
@@ -80,11 +78,13 @@ protected:
 	DWORD64 totalAccept = 0;
 	DWORD64 totalSend = 0;
 	DWORD64 totalRecv = 0;
+	DWORD64 totalRelease = 0;
 	//tps측정용 기억
 	DWORD64 lastAccept = 0;
 	DWORD64 lastSend = 0;
 	DWORD64 lastRecv = 0;
-	
+	DWORD64 lastRelease = 0;
+
 	DWORD64 recvBytes = 0;
 	DWORD64 sendBytes = 0;
 	

@@ -174,16 +174,17 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
-        job.sessionID = sessionID;
-        job.packet = packet;
+        //job.type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
+        //job.sessionID = sessionID;
+        //job.packet = packet;
 
-        jobQ.Enqueue(job);
+        //jobQ.Enqueue(job);
     }
         break;
 
     default:
-        OnError(-1, L"Packet Type Error");
+        //OnError(-1, L"Packet Type Error");
+        PacketFree(packet);
         Disconnect(sessionID);
     }
 }
@@ -219,21 +220,33 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
             continue;
         }
         
+
+
+
         switch (job.type) {
         case en_PACKET_CS_CHAT_REQ_LOGIN:
-        {
+        {        char* temp = job.packet->GetBufferPtr();
+        if (*temp != 0x77) {
+            temp = temp;
+        }
             server->Recv_Login(job.sessionID, job.packet);
         }
         break;
 
         case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-        {
+        {        char* temp = job.packet->GetBufferPtr();
+        if (*temp != 0x77) {
+            temp = temp;
+        }
             server->Recv_SectorMove(job.sessionID, job.packet);
         }
         break;
 
         case en_PACKET_CS_CHAT_REQ_MESSAGE:
-        {
+        {        char* temp = job.packet->GetBufferPtr();
+        if (*temp != 0x77) {
+            temp = temp;
+        }
             server->Recv_Message(job.sessionID, job.packet);
         }
         break;
@@ -311,7 +324,6 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 
     player->lastAct = en_PACKET_CS_CHAT_REQ_LOGIN;
 
-    PacketFree(packet);
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
         if (accountNoSet.find(player->accountNo) != accountNoSet.end()) {
@@ -323,13 +335,21 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
+        if (player->accountNo > 5000 || player->accountNo < 0) {
+            player = player;
+        }
         Res_Login(player->accountNo, sessionID, 1);
+        PacketFree(packet);
         //player sector map에 삽입
         playerMap.insert({ sessionID, player });
         accountNoSet.insert(player->accountNo);
     }
     else {
+        if (player->accountNo > 5000 || player->accountNo < 0) {
+            player = player;
+        }
         Res_Login(player->accountNo, sessionID, 0);
+        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
