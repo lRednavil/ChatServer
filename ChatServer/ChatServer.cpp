@@ -590,7 +590,6 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         }
     }
 
-    accountNoSet.erase(player->accountNo);
     //playerMap에서 제거
     playerMap.erase(sessionID);
     
