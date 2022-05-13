@@ -128,6 +128,7 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
     JOB job;
     job.type = en_SERVER_DISCONNECT;
     job.sessionID = sessionID;
+    job.packet = NULL;
     
     jobQ.Enqueue(job);
 
@@ -195,6 +196,7 @@ void ChatServer::OnTimeOut(DWORD64 sessionID)
 
     job.type = en_SERVER_DISCONNECT;
     job.sessionID = sessionID;
+    job.packet = NULL;
     
     jobQ.Enqueue(job);
     OnError(timeOutCnt++, L"Time Out!!");
@@ -219,8 +221,6 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
             Sleep(0);
             continue;
         }
-        
-
 
 
         switch (job.type) {
@@ -246,7 +246,6 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
         {
             //지금 당장은 함수 Call의 이유가 없음
             //server->Recv_HeartBeat(job.sessionID, job.packet);
-            server->PacketFree(job.packet);
         }
         break;
         case en_SERVER_DISCONNECT:
@@ -257,6 +256,10 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
         default:
             server->Disconnect(job.sessionID);
         }
+    }
+
+    if (job.packet != NULL) {
+        server->PacketFree(job.packet);
     }
 
     return 0;
@@ -317,12 +320,6 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
-        if (accountNoSet.find(player->accountNo) != accountNoSet.end()) {
-            Res_Login(player->accountNo, sessionID, 0);
-            Disconnect(sessionID);
-            return;
-        }
-
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
@@ -330,17 +327,14 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
             player = player;
         }
         Res_Login(player->accountNo, sessionID, 1);
-        PacketFree(packet);
         //player sector map에 삽입
         playerMap.insert({ sessionID, player });
-        accountNoSet.insert(player->accountNo);
     }
     else {
         if (player->accountNo > 5000 || player->accountNo < 0) {
             player = player;
         }
         Res_Login(player->accountNo, sessionID, 0);
-        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
@@ -367,7 +361,6 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         player = playerMap[sessionID];
     }
     else {
-        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
@@ -377,8 +370,6 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 
     //accountNO처리 한번더 고민
     *packet >> accountNo >> newSectorX >> newSectorY;
-
-    PacketFree(packet);
     
     //contents방어
     if (player->accountNo != accountNo) {
@@ -446,7 +437,6 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         player = playerMap[sessionID];
     }
     else {
-        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
@@ -458,12 +448,10 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 
     //contents방어
     if (player->accountNo != accountNo) {
-        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
     if (player->sectorX == SECTOR_X_MAX || player->sectorY == SECTOR_Y_MAX) {
-        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
@@ -471,8 +459,6 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
     msg = new WCHAR[msgLen / 2];
 
     packet->GetData((char*)msg, msgLen);
-    
-    PacketFree(packet);
 
     //컨텐츠 모니터링용
     {
@@ -518,8 +504,6 @@ void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 {
     PLAYER* player;
 
-    PacketFree(packet);
-
     //find player
     if (playerMap.find(sessionID) != playerMap.end()) {
         player = playerMap[sessionID];
@@ -547,7 +531,6 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
         player = playerMap[sessionID];
     }
     else {
-        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }

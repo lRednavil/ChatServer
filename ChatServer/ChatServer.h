@@ -80,7 +80,6 @@ private:
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
 	std::unordered_map<INT64, PLAYER*> playerMap;
-	std::unordered_set<INT64> accountNoSet;
 
 	DWORD64 timeOutCnt = 0;
 	//메세지에서 L'='수신 카운트
