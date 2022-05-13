@@ -225,28 +225,19 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 
         switch (job.type) {
         case en_PACKET_CS_CHAT_REQ_LOGIN:
-        {        char* temp = job.packet->GetBufferPtr();
-        if (*temp != 0x77) {
-            temp = temp;
-        }
+        {        
             server->Recv_Login(job.sessionID, job.packet);
         }
         break;
 
         case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-        {        char* temp = job.packet->GetBufferPtr();
-        if (*temp != 0x77) {
-            temp = temp;
-        }
+        {
             server->Recv_SectorMove(job.sessionID, job.packet);
         }
         break;
 
         case en_PACKET_CS_CHAT_REQ_MESSAGE:
-        {        char* temp = job.packet->GetBufferPtr();
-        if (*temp != 0x77) {
-            temp = temp;
-        }
+        {        
             server->Recv_Message(job.sessionID, job.packet);
         }
         break;
