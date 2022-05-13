@@ -256,10 +256,10 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
         default:
             server->Disconnect(job.sessionID);
         }
-    }
 
-    if (job.packet != NULL) {
-        server->PacketFree(job.packet);
+        if (job.packet != NULL) {
+            server->PacketFree(job.packet);
+        }
     }
 
     return 0;
@@ -419,7 +419,7 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 {
     CPacket* packet = PacketAlloc();
-
+    
     *packet << (WORD)en_PACKET_SC_CHAT_RES_SECTOR_MOVE << player->accountNo << player->sectorX << player->sectorY;
 
     SendPacket(sessionID, packet);
