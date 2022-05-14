@@ -173,13 +173,14 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     {
         //지금 당장은 함수 Call의 이유가 없음
         //server->Recv_HeartBeat(job.sessionID, job.packet);
-        PacketFree(packet);
     }
         break;
 
     default:
         Disconnect(sessionID);
     }
+
+    PacketFree(packet);
 }
 
 void ChatServer::OnTimeOut(DWORD64 sessionID)
@@ -246,7 +247,6 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 
     int mapID = GetMapID(sessionID);
 
-    PacketFree(packet);
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     AcquireSRWLockExclusive(&playerMapLock[mapID]);
     if (playerMap[mapID].find(sessionID) == playerMap[mapID].end()) {
@@ -277,8 +277,9 @@ void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
 void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
     PLAYER* player;
-    WORD oldSectorX;
-    WORD oldSectorY;
+    INT64 accountNo;
+    WORD newSectorX;
+    WORD newSectorY;
     
     int mapID = GetMapID(sessionID);
 
@@ -290,40 +291,40 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     }
     else {
         ReleaseSRWLockShared(&playerMapLock[mapID]);
-        PacketFree(packet);
         Disconnect(sessionID);
         return;
     }
 
-    oldSectorX = player->sectorX;
-    oldSectorY = player->sectorY;
-
     //accountNO처리 한번더 고민
-    *packet >> player->accountNo >> player->sectorX >> player->sectorY;
+    *packet >> accountNo >> newSectorX >> newSectorY;
 
-    PacketFree(packet);
+    //contents방어
+    if (player->accountNo != accountNo) {
+        Disconnect(sessionID);
+        return;
+    }
 
     //oldSector 제거
     std::list<DWORD64>::iterator itr;
     //monitor용
     int listSize;
     
-    if (oldSectorY == SECTOR_Y_MAX || oldSectorX == SECTOR_X_MAX)
+    if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX)
     {
-        AcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
+        AcquireSRWLockExclusive(&sectorLock[newSectorY][newSectorX]);
         goto NEW_SECTOR;
     }
-    else if (oldSectorY == player->sectorY && oldSectorX == player->sectorX) {
+    else if (newSectorY == player->sectorY && newSectorX == player->sectorX) {
         Res_SectorMove(player, sessionID);
         return;
     }
     else
     {
         for (;;) {
-            if (TryAcquireSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]) == false) continue;
+            if (TryAcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]) == false) continue;
 
-			if (TryAcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]) == false) {
-				ReleaseSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]);
+			if (TryAcquireSRWLockExclusive(&sectorLock[newSectorY][newSectorX]) == false) {
+				ReleaseSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
 			}
 			else {
 				break;
@@ -331,28 +332,35 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         }
     }
 
-	for (itr = sectorList[oldSectorY][oldSectorX].begin(); itr != sectorList[oldSectorY][oldSectorX].end(); ++itr) {
+	for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
 		if (*itr == sessionID) {
 			//mointor용
-			listSize = sectorList[oldSectorY][oldSectorX].size();
+			listSize = sectorList[player->sectorY][player->sectorX].size();
             InterlockedDecrement((long*)&sectorCnt[listSize]);
             InterlockedIncrement((long*)&sectorCnt[listSize - 1]);
 
-			sectorList[oldSectorY][oldSectorX].erase(itr);
+			sectorList[player->sectorY][player->sectorX].erase(itr);
 			break;
 		}
 	}
-    ReleaseSRWLockExclusive(&sectorLock[oldSectorY][oldSectorX]);
+    ReleaseSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
     
     //newSector 삽입
     //mointor용
-    NEW_SECTOR:
-    listSize = sectorList[player->sectorY][player->sectorX].size();
+NEW_SECTOR:
+    //contents 방어
+    if (newSectorX >= SECTOR_X_MAX || newSectorY >= SECTOR_Y_MAX)
+    {
+        Disconnect(sessionID);
+        return;
+    }
+
+    listSize = sectorList[newSectorY][newSectorX].size();
     InterlockedDecrement((long*)&sectorCnt[listSize]);
     InterlockedIncrement((long*)&sectorCnt[listSize + 1]);
 
-    sectorList[player->sectorY][player->sectorX].push_back(sessionID);
-    ReleaseSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
+    sectorList[newSectorY][newSectorX].push_back(sessionID);
+    ReleaseSRWLockExclusive(&sectorLock[newSectorY][newSectorX]);
 
     Res_SectorMove(player, sessionID);
 }
@@ -368,11 +376,35 @@ void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 
 void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 {
+    PLAYER* player;
     INT64 accountNo;
     WORD msgLen;
     WCHAR* msg;
 
+    int mapID = GetMapID(sessionID);
+    //find player        
+    AcquireSRWLockShared(&playerMapLock[mapID]);
+    if (playerMap[mapID].find(sessionID) != playerMap[mapID].end()) {
+        player = playerMap[mapID][sessionID];
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
+    }
+    else {
+        ReleaseSRWLockShared(&playerMapLock[mapID]);
+        Disconnect(sessionID);
+        return;
+    }
+
     *packet >> accountNo >> msgLen;
+    
+    //contents방어
+    if (player->accountNo != accountNo) {
+        Disconnect(sessionID);
+        return;
+    }
+    if (player->sectorX == SECTOR_X_MAX || player->sectorY == SECTOR_Y_MAX) {
+        Disconnect(sessionID);
+        return;
+    }
 
     msg = new WCHAR[msgLen / 2];
 
