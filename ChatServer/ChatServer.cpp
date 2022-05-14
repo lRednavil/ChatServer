@@ -412,8 +412,6 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
     msg = new WCHAR[msgLen / 2];
 
     packet->GetData((char*)msg, msgLen);
-    
-    PacketFree(packet);
 
     //컨텐츠 모니터링용
     {
@@ -441,6 +439,7 @@ void ChatServer::Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len)
     }
     else {
         ReleaseSRWLockShared(&playerMapLock[mapID]);
+        delete msg;
         Disconnect(sessionID);
         return;
     }
@@ -463,8 +462,6 @@ void ChatServer::Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len)
 void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 {
     PLAYER* player;
-
-    PacketFree(packet);
 
     int mapID = GetMapID(sessionID);
 
