@@ -307,7 +307,14 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     //oldSector 제거
     std::list<DWORD64>::iterator itr;
     //monitor용
-    int listSize;
+    //int listSize;
+
+    //contents 방어
+    if (newSectorX >= SECTOR_X_MAX || newSectorY >= SECTOR_Y_MAX)
+    {
+        Disconnect(sessionID);
+        return;
+    }
     
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX)
     {
@@ -335,9 +342,9 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 	for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
 		if (*itr == sessionID) {
 			//mointor용
-			listSize = sectorList[player->sectorY][player->sectorX].size();
-            InterlockedDecrement((long*)&sectorCnt[listSize]);
-            InterlockedIncrement((long*)&sectorCnt[listSize - 1]);
+			//listSize = sectorList[player->sectorY][player->sectorX].size();
+            ////InterlockedDecrement((long*)&sectorCnt[listSize]);
+            //InterlockedIncrement((long*)&sectorCnt[listSize - 1]);
 
 			sectorList[player->sectorY][player->sectorX].erase(itr);
 			break;
@@ -348,19 +355,15 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     //newSector 삽입
     //mointor용
 NEW_SECTOR:
-    //contents 방어
-    if (newSectorX >= SECTOR_X_MAX || newSectorY >= SECTOR_Y_MAX)
-    {
-        Disconnect(sessionID);
-        return;
-    }
-
-    listSize = sectorList[newSectorY][newSectorX].size();
-    InterlockedDecrement((long*)&sectorCnt[listSize]);
-    InterlockedIncrement((long*)&sectorCnt[listSize + 1]);
+    //listSize = sectorList[newSectorY][newSectorX].size();
+    ////InterlockedDecrement((long*)&sectorCnt[listSize]);
+    //InterlockedIncrement((long*)&sectorCnt[listSize + 1]);
 
     sectorList[newSectorY][newSectorX].push_back(sessionID);
     ReleaseSRWLockExclusive(&sectorLock[newSectorY][newSectorX]);
+
+    player->sectorX = newSectorX;
+    player->sectorY = newSectorY;
 
     Res_SectorMove(player, sessionID);
 }
@@ -591,16 +594,16 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     //sectorList에서 제거
 
     //mointor용
-    int listSize;
+    //int listSize;
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
         AcquireSRWLockExclusive(&sectorLock[player->sectorY][player->sectorX]);
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
                 //mointor용
-                listSize = sectorList[player->sectorY][player->sectorX].size();
-                InterlockedDecrement((long*)&sectorCnt[listSize]);
-                InterlockedIncrement((long*)&sectorCnt[listSize - 1]);
+                //listSize = sectorList[player->sectorY][player->sectorX].size();
+                ////InterlockedDecrement((long*)&sectorCnt[listSize]);
+                //InterlockedIncrement((long*)&sectorCnt[listSize - 1]);
 
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
