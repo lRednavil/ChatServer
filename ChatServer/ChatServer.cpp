@@ -408,6 +408,10 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
+    if (packet->GetDataSize() < msgLen) {
+        Disconnect(sessionID);
+        return;
+    }
 
     msg = new WCHAR[msgLen / 2];
 

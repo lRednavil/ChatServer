@@ -231,10 +231,10 @@ private:
 	//
 	// Return:
 	//////////////////////////////////////////////////////////////////////////
-	CPacket();
-	CPacket(int size);
+		CPacket();
+		CPacket(int size);
 
-	virtual	~CPacket();
+		virtual	~CPacket();
 };
 
 
