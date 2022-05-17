@@ -323,17 +323,11 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
-        if (player->accountNo > 5000 || player->accountNo < 0) {
-            player = player;
-        }
         Res_Login(player->accountNo, sessionID, 1);
         //player sector map에 삽입
         playerMap.insert({ sessionID, player });
     }
     else {
-        if (player->accountNo > 5000 || player->accountNo < 0) {
-            player = player;
-        }
         Res_Login(player->accountNo, sessionID, 0);
         Disconnect(sessionID);
         return;
@@ -452,6 +446,10 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         return;
     }
     if (player->sectorX == SECTOR_X_MAX || player->sectorY == SECTOR_Y_MAX) {
+        Disconnect(sessionID);
+        return;
+    }
+    if (packet->GetDataSize() < msgLen) {
         Disconnect(sessionID);
         return;
     }
