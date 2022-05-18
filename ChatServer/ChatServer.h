@@ -19,7 +19,6 @@ struct PLAYER {
 	WORD sectorY;
 
 	DWORD lastTime;
-	DWORD lastAct;
 };
 
 struct JOB {

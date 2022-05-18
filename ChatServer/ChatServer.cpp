@@ -316,8 +316,6 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
     packet->GetData((char*)player->Nickname, 40);
     packet->GetData(player->sessionKey, 64);
 
-    player->lastAct = en_PACKET_CS_CHAT_REQ_LOGIN;
-
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
         //sector정보 초기화목적
@@ -358,9 +356,6 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
-
-    player->lastAct = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
-
 
     //accountNO처리 한번더 고민
     *packet >> accountNo >> newSectorX >> newSectorY;
@@ -424,7 +419,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
     PLAYER* player;
     INT64 accountNo;
     WORD msgLen;
-    WCHAR* msg;
+    WCHAR msg[512];
 
     //find player
     if (playerMap.find(sessionID) != playerMap.end()) {
@@ -434,9 +429,6 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
-
-
-    player->lastAct = en_PACKET_CS_CHAT_REQ_MESSAGE;
 
     *packet >> accountNo >> msgLen;
 
@@ -453,8 +445,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
-
-    msg = new WCHAR[msgLen / 2];
+    
 
     packet->GetData((char*)msg, msgLen);
 
@@ -492,8 +483,6 @@ void ChatServer::Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len)
 
     *packet << len;
     packet->PutData((char*)msg, len);
-
-    delete msg;
 
     SendSectorAround(sessionID, packet);
 }
