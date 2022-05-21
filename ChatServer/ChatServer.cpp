@@ -348,7 +348,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
     PLAYER* player;
     INT64 accountNo;
     WORD msgLen;
-    WCHAR* msg;
+    WCHAR msg[512];
 
     //find player
     if (playerMap.find(sessionID) != playerMap.end()) {
@@ -375,8 +375,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
-
-    msg = new WCHAR[msgLen / 2];
+    
 
     packet->GetData((char*)msg, msgLen);
 
@@ -414,8 +413,6 @@ void ChatServer::Res_Message(DWORD64 sessionID, WCHAR* msg, WORD len)
 
     *packet << len;
     packet->PutData((char*)msg, len);
-
-    delete msg;
 
     SendSectorAround(sessionID, packet);
 }
