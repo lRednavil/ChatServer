@@ -14,78 +14,10 @@
 
 //에러 처리용 덤프와 로깅
 #include "Dump.h"
+#include "Logging.h"
 
 #pragma comment (lib, "NetworkLibrary")
 #pragma comment (lib, "Winmm")
-//LOG
-#pragma region LOG
-
-#define LOG_LEVEL_DEBUG 0
-#define LOG_LEVEL_SYSTEM 1
-#define LOG_LEVEL_ERROR 2
-
-int g_logLevel;
-WCHAR g_logBuf[1024];
-WCHAR g_logFileName[MAX_PATH];
-
-inline void Log(WCHAR* str, int logLevel) {
-    wprintf(L"%s \n", str);
-}
-
-inline void LogInit() {
-    SYSTEMTIME nowTime;
-
-    GetLocalTime(&nowTime);
-    wsprintf(g_logFileName, L"LOG\\LOG_%d%02d%02d_%02d.%02d.%02d",
-        nowTime.wYear, nowTime.wMonth, nowTime.wDay, nowTime.wHour, nowTime.wMinute, nowTime.wSecond);
-
-    _wmkdir(L"LOG");
-}
-
-inline void ErrorLog(const WCHAR* str) {
-    FILE* fp;
-    WCHAR fileName[MAX_PATH];
-    DWORD threadID = GetCurrentThreadId();
-
-    swprintf_s(fileName, L"%s_%u.txt",g_logFileName, threadID);
-       
-    _wfopen_s(&fp, fileName, L"at");
-    if (fp == NULL) return;
-
-    fwprintf_s(fp, str);
-    fwprintf_s(fp, L"\n");
-
-    fclose(fp);
-}
-
-inline void ErrorLog(const int err, const WCHAR* str) {
-    FILE* fp;
-    WCHAR fileName[MAX_PATH];
-    DWORD threadID = GetCurrentThreadId();
-
-    swprintf_s(fileName, L"%s_%u.txt", g_logFileName, threadID);
-
-    _wfopen_s(&fp, fileName, L"at");
-    if (fp == NULL) return;
-
-    fwprintf_s(fp, L"%d ", err);
-    fwprintf_s(fp, str);
-    fwprintf_s(fp, L"\n");
-
-    fclose(fp);
-}
-
-#define _LOG(LogLevel, fmt, ...)    \
-do{                                 \
-    if(g_logLevel <= LogLevel){     \
-        wsprintf(g_logBuf, fmt, ##__VA_ARGS__);  \
-        Log(g_logBuf, LogLevel);                 \
-    }                                            \
-}while(0)                                    
-
-
-
-#pragma endregion
 
 #define PORT 11601
 #define MAX_CONNECT 10000
@@ -184,7 +116,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
         break;
 
     default:
-        //OnError(-1, L"Packet Type Error");
+        //_FILE_LOG(LOG_LEVEL_ERROR, L"ContentsLog", L"Packet Type Error");
         PacketFree(packet);
         Disconnect(sessionID);
     }
@@ -204,10 +136,7 @@ void ChatServer::OnTimeOut(DWORD64 sessionID)
 
 void ChatServer::OnError(int error, const WCHAR* msg)
 {
-    if (error != -1) {
-        ErrorLog(error, msg);
-    }
-    else ErrorLog(msg);
+    _LOG(LOG_LEVEL_ERROR, msg);
 }
 
 unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
@@ -316,8 +245,6 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
     packet->GetData((char*)player->Nickname, 40);
     packet->GetData(player->sessionKey, 64);
 
-    player->lastAct = en_PACKET_CS_CHAT_REQ_LOGIN;
-
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
         //sector정보 초기화목적
@@ -339,7 +266,7 @@ void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
     CPacket* packet = PacketAlloc();
     
     *packet << (WORD)en_PACKET_SC_CHAT_RES_LOGIN << isSuccess << accountNo;
-
+    
     SendPacket(sessionID, packet);
 }
 
@@ -358,9 +285,6 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
-
-    player->lastAct = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
-
 
     //accountNO처리 한번더 고민
     *packet >> accountNo >> newSectorX >> newSectorY;
@@ -435,8 +359,6 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
-
-    player->lastAct = en_PACKET_CS_CHAT_REQ_MESSAGE;
 
     *packet >> accountNo >> msgLen;
 

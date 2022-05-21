@@ -149,6 +149,7 @@
     <ClInclude Include="LockFreeMemoryPool.h" />
     <ClInclude Include="LockFreeQueue.h" />
     <ClInclude Include="LockFreeStack.h" />
+    <ClInclude Include="Logging.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="SerializedBuffer.h" />
     <ClInclude Include="TLSMemoryPool.h" />
