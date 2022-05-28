@@ -1,4 +1,9 @@
-﻿#include <iostream>
+﻿#include <cpp_redis/cpp_redis>
+
+#include <string>
+#include <vector>
+
+#include <iostream>
 #include <Windows.h>
 #include <direct.h>
 
@@ -16,6 +21,9 @@
 #include "Dump.h"
 #include "Logging.h"
 
+#pragma comment (lib, "cpp_redis.lib")
+#pragma comment (lib, "tacopie.lib")
+
 #pragma comment (lib, "NetworkLibrary")
 #pragma comment (lib, "Winmm")
 
@@ -28,7 +36,7 @@ CDump dump;
 ChatServer g_ChatServer;
 WCHAR IP[16] = L"0.0.0.0";
 
-WCHAR redisIP[16] = L"10.0.2.2";
+char redisIP[16] = "10.0.2.2";
 
 CTLSMemoryPool<PLAYER> g_playerPool;
 CTLSMemoryPool<REDIS_JOB> redisJobPool;
@@ -49,6 +57,13 @@ ChatServer::ChatServer()
 ChatServer::~ChatServer()
 {
     isServerOn = false;
+
+    SetEvent(redisEvent[1]);
+    WaitForMultipleObjects(REDIS_THREAD, hRedis, true, INFINITE);
+
+    delete redisJobQ;
+
+    TlsFree(redisTLS);
 
     WaitForSingleObject(hThreads, INFINITE);
 }
@@ -532,6 +547,8 @@ unsigned int __stdcall ChatServer::RedisWork(void* arg)
     ChatServer* server = (ChatServer*)arg;
     REDIS_JOB* job;
 
+    bool loginRes;
+
     DWORD redisTime;
     DWORD deltaTime;
 
@@ -546,6 +563,7 @@ unsigned int __stdcall ChatServer::RedisWork(void* arg)
 
     std::string chatKey;
     std::string value;
+    std::vector<std::string> delKeys;
 
     for (;;) {
         //1인 경우 exit
@@ -559,15 +577,28 @@ unsigned int __stdcall ChatServer::RedisWork(void* arg)
         }
 
         chatKey = std::to_string(job->player->accountNo) + ".Chat";
-        value.assign(job->player->sessionKey);
+        value = job->player->sessionKey;
 
         redisTime = timeGetTime();
-        redis->setex(chatKey, 15, value, nullptr);
+        redis->get(chatKey, [&](cpp_redis::reply& reply) {
+            loginRes = value == reply.as_string();
+            delKeys.push_back(chatKey);
+            redis->del(delKeys);
+            delKeys.pop_back();
+            });
 
         redis->sync_commit();
         deltaTime = timeGetTime() - redisTime;
 
-        server->Res_Login(job->player->accountNo, job->sessionID, 1);
+        if (loginRes) {
+            //sector정보 초기화목적
+            job->player->sectorX = SECTOR_X_MAX;
+            job->player->sectorY = SECTOR_Y_MAX;
+            //player sector map에 삽입
+            server->playerMap.insert({ job->sessionID, job->player });
+        }
+
+        server->Res_Login(job->player->accountNo, job->sessionID, loginRes);
 
         redisJobPool.Free(job);
     }
