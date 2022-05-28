@@ -38,10 +38,10 @@ WCHAR IP[16] = L"0.0.0.0";
 
 char redisIP[16] = "10.0.2.2";
 
-//CTLSMemoryPool<PLAYER> g_playerPool;
-//CTLSMemoryPool<REDIS_JOB> redisJobPool; 
-CLockFreeMemoryPool<PLAYER> g_playerPool;
-CLockFreeMemoryPool<REDIS_JOB> redisJobPool;
+CTLSMemoryPool<PLAYER> g_playerPool;
+CTLSMemoryPool<REDIS_JOB> redisJobPool; 
+//CLockFreeMemoryPool<PLAYER> g_playerPool;
+//CLockFreeMemoryPool<REDIS_JOB> redisJobPool;
 
 ChatServer::ChatServer()
 {
@@ -179,10 +179,10 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
             continue;
         }
 
-
         switch (job.type) {
         case en_PACKET_CS_CHAT_REQ_LOGIN:
         {        
+            _FILE_LOG(LOG_LEVEL_DEBUG, L"Type_Log", L"Login");
             server->Recv_Login(job.sessionID, job.packet);
         }
         break;
@@ -275,14 +275,13 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
+        //sector정보 초기화목적
+        player->sectorX = SECTOR_X_MAX;
+        player->sectorY = SECTOR_Y_MAX;
+        //player sector map에 삽입
+        playerMap.insert({ sessionID, player });
+
         PutRedisJob(sessionID, player);
-        
-        ////sector정보 초기화목적
-        //player->sectorX = SECTOR_X_MAX;
-        //player->sectorY = SECTOR_Y_MAX;
-        //Res_Login(player->accountNo, sessionID, 1);
-        ////player sector map에 삽입
-        //playerMap.insert({ sessionID, player });
     }
     else {
         Res_Login(player->accountNo, sessionID, 0);
@@ -565,7 +564,6 @@ unsigned int __stdcall ChatServer::RedisWork(void* arg)
 
     std::string chatKey;
     std::string value;
-    std::vector<std::string> delKeys;
 
     for (;;) {
         //1인 경우 exit
@@ -579,29 +577,28 @@ unsigned int __stdcall ChatServer::RedisWork(void* arg)
         }
 
         chatKey = std::to_string(job->player->accountNo) + ".Chat";
-        value = job->player->sessionKey;
 
         redisTime = timeGetTime();
         redis->get(chatKey, [&](cpp_redis::reply& reply) {
-            loginRes = reply.as_string().compare(job->player->sessionKey);
+            value = reply.as_string();
+            loginRes = memcmp(value.c_str(), job->player->sessionKey, 64) == 0;
             });
-        delKeys.push_back(chatKey);
-        redis->del(delKeys);
-        delKeys.pop_back();
-
         redis->sync_commit();
+
+        if (loginRes) {
+            redis->del({ chatKey });
+            redis->sync_commit();
+        }
 
         deltaTime = timeGetTime() - redisTime;
 
         if (loginRes) {
-            //sector정보 초기화목적
-            job->player->sectorX = SECTOR_X_MAX;
-            job->player->sectorY = SECTOR_Y_MAX;
-            //player sector map에 삽입
-            server->playerMap.insert({ job->sessionID, job->player });
+            server->Res_Login(job->player->accountNo, job->sessionID, loginRes);
         }
-
-        server->Res_Login(job->player->accountNo, job->sessionID, loginRes);
+        else {
+            server->Res_Login(job->player->accountNo, job->sessionID, loginRes);
+            server->Disconnect(job->sessionID);
+        }
 
         redisJobPool.Free(job);
     }

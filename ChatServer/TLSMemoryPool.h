@@ -64,6 +64,7 @@ inline CTLSMemoryPool<DATA>::CTLSMemoryPool(int chunkSize, bool newCall) : chunk
 template<class DATA>
 inline CTLSMemoryPool<DATA>::~CTLSMemoryPool()
 {
+	delete chunkPool;
 	TlsFree(tlsID);
 }
 
@@ -74,6 +75,12 @@ inline DATA* CTLSMemoryPool<DATA>::Alloc()
 	DATA* ret;
 
 	if (chunk == NULL) {
+		_InterlockedIncrement((long*)&useCount);
+		chunk = ChunkAlloc();
+		TlsSetValue(tlsID, (void*)chunk);
+	}
+	
+	if (chunk->useCount == 0) {
 		_InterlockedIncrement((long*)&useCount);
 		chunk = ChunkAlloc();
 		TlsSetValue(tlsID, (void*)chunk);
@@ -91,11 +98,6 @@ inline DATA* CTLSMemoryPool<DATA>::Alloc()
 		new (ret)DATA;
 	}
 
-	if (chunk->useCount == 0) {
-		_InterlockedIncrement((long*)&useCount);
-		chunk = ChunkAlloc();
-		TlsSetValue(tlsID, (void*)chunk);
-	}
 
 	return ret;
 }
