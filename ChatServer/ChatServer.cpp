@@ -27,7 +27,7 @@
 #pragma comment (lib, "NetworkLibrary")
 #pragma comment (lib, "Winmm")
 
-#define PORT 11601
+#define PORT 11701
 #define MAX_CONNECT 10000
 
 #define TIME_OUT 40000
@@ -38,8 +38,10 @@ WCHAR IP[16] = L"0.0.0.0";
 
 char redisIP[16] = "10.0.2.2";
 
-CTLSMemoryPool<PLAYER> g_playerPool;
-CTLSMemoryPool<REDIS_JOB> redisJobPool;
+//CTLSMemoryPool<PLAYER> g_playerPool;
+//CTLSMemoryPool<REDIS_JOB> redisJobPool; 
+CLockFreeMemoryPool<PLAYER> g_playerPool;
+CLockFreeMemoryPool<REDIS_JOB> redisJobPool;
 
 ChatServer::ChatServer()
 {
@@ -581,13 +583,14 @@ unsigned int __stdcall ChatServer::RedisWork(void* arg)
 
         redisTime = timeGetTime();
         redis->get(chatKey, [&](cpp_redis::reply& reply) {
-            loginRes = value == reply.as_string();
-            delKeys.push_back(chatKey);
-            redis->del(delKeys);
-            delKeys.pop_back();
+            loginRes = reply.as_string().compare(job->player->sessionKey);
             });
+        delKeys.push_back(chatKey);
+        redis->del(delKeys);
+        delKeys.pop_back();
 
         redis->sync_commit();
+
         deltaTime = timeGetTime() - redisTime;
 
         if (loginRes) {
@@ -617,6 +620,7 @@ void ChatServer::PutRedisJob(DWORD64 sessionID, PLAYER* player)
     job->player = player;
 
     redisJobQ->Enqueue(job);
+    SetEvent(redisEvent[0]);
 }
 
 int main()

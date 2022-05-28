@@ -44,7 +44,7 @@ public:
 
 private:
 	enum {
-		REDIS_THREAD = 4
+		REDIS_THREAD = 2
 	};
 //virtual함수 영역
 private:
