@@ -28,11 +28,22 @@ CDump dump;
 ChatServer g_ChatServer;
 WCHAR IP[16] = L"0.0.0.0";
 
+WCHAR redisIP[16] = L"10.0.2.2";
+
 CTLSMemoryPool<PLAYER> g_playerPool;
+CTLSMemoryPool<REDIS_JOB> redisJobPool;
 
 ChatServer::ChatServer()
 {
-    
+    redisTLS = TlsAlloc();
+    redisEvent[0] = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
+    redisEvent[1] = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    redisJobQ = new CLockFreeQueue<REDIS_JOB*>;
+
+    for (int cnt = 0; cnt < REDIS_THREAD; cnt++) {
+        hRedis[cnt] = (HANDLE)_beginthreadex(NULL, 0, RedisWork, this, 0, NULL);
+    }
 }
 
 ChatServer::~ChatServer()
@@ -247,15 +258,18 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 
     //플레이어 생성 성공(추가 가능한 필터링 -> 아이디나 닉네임 규정 위반)
     if (playerMap.find(sessionID) == playerMap.end()) {
-        //sector정보 초기화목적
-        player->sectorX = SECTOR_X_MAX;
-        player->sectorY = SECTOR_Y_MAX;
-        Res_Login(player->accountNo, sessionID, 1);
-        //player sector map에 삽입
-        playerMap.insert({ sessionID, player });
+        PutRedisJob(sessionID, player);
+        
+        ////sector정보 초기화목적
+        //player->sectorX = SECTOR_X_MAX;
+        //player->sectorY = SECTOR_Y_MAX;
+        //Res_Login(player->accountNo, sessionID, 1);
+        ////player sector map에 삽입
+        //playerMap.insert({ sessionID, player });
     }
     else {
         Res_Login(player->accountNo, sessionID, 0);
+        g_playerPool.Free(player);
         Disconnect(sessionID);
         return;
     }
@@ -511,6 +525,67 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     playerMap.erase(sessionID);
     
     g_playerPool.Free(player);
+}
+
+unsigned int __stdcall ChatServer::RedisWork(void* arg)
+{
+    ChatServer* server = (ChatServer*)arg;
+    REDIS_JOB* job;
+
+    DWORD redisTime;
+    DWORD deltaTime;
+
+    WORD version = MAKEWORD(2, 2);
+    WSADATA data;
+    WSAStartup(version, &data);
+
+    cpp_redis::client* redis = new cpp_redis::client;
+    TlsSetValue(server->redisTLS, redis);
+
+    redis->connect(redisIP, 6379U, nullptr, 0U, 0, 0U);
+
+    std::string chatKey;
+    std::string value;
+
+    for (;;) {
+        //1인 경우 exit
+        if (WaitForMultipleObjects(2, server->redisEvent, false, INFINITE) - WAIT_OBJECT_0 == 1) {
+            break;
+        }
+
+        if (server->redisJobQ->Dequeue(&job) == false) {
+            ResetEvent(server->redisEvent[0]);
+            continue;
+        }
+
+        chatKey = std::to_string(job->player->accountNo) + ".Chat";
+        value.assign(job->player->sessionKey);
+
+        redisTime = timeGetTime();
+        redis->setex(chatKey, 15, value, nullptr);
+
+        redis->sync_commit();
+        deltaTime = timeGetTime() - redisTime;
+
+        server->Res_Login(job->player->accountNo, job->sessionID, 1);
+
+        redisJobPool.Free(job);
+    }
+
+    redis->flushall();
+    WSACleanup();
+
+    return 0;
+}
+
+void ChatServer::PutRedisJob(DWORD64 sessionID, PLAYER* player)
+{
+    REDIS_JOB* job = redisJobPool.Alloc();
+
+    job->sessionID = sessionID;
+    job->player = player;
+
+    redisJobQ->Enqueue(job);
 }
 
 int main()

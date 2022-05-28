@@ -27,6 +27,11 @@ struct JOB {
 	CPacket* packet;
 };
 
+struct REDIS_JOB {
+	DWORD64 sessionID;
+	PLAYER* player;
+};
+
 class ChatServer : public CNetServer
 {
 public:
@@ -37,6 +42,10 @@ public:
 	
 	void ContentsMonitor();
 
+private:
+	enum {
+		REDIS_THREAD = 4
+	};
 //virtual함수 영역
 private:
 	//accept 직후, IP filterinig 등의 목적
@@ -72,6 +81,10 @@ private:
 	void SendSectorAround(DWORD64 sessionID, CPacket* packet);
 	void DisconnectProc(DWORD64 sessionID);
 
+//Redis 전용 함수 영역
+	static unsigned int __stdcall RedisWork(void* arg);
+	void PutRedisJob(DWORD64 sessionID, PLAYER* player);
+
 
 private:
 	CLockFreeQueue<JOB> jobQ;
@@ -84,6 +97,12 @@ private:
 	//메세지에서 L'='수신 카운트
 	DWORD64 logOutRecv = 0;
 	DWORD64 chatCnt = 0;
+
+	DWORD redisTLS;
+	HANDLE hRedis[REDIS_THREAD];
+	//0 for work 1 for exit
+	HANDLE redisEvent[2];
+	CLockFreeQueue<REDIS_JOB*>* redisJobQ;
 
 	int sectorCnt[50] = { 2500, };
 
