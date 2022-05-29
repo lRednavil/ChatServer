@@ -80,19 +80,19 @@ inline DATA* CTLSMemoryPool<DATA>::Alloc()
 		TlsSetValue(tlsID, (void*)chunk);
 	}
 	
+	if (chunk->useCount < 0) {
+		abort();
+	}
+
+	--chunk->useCount;
+	
+	ret = &(chunk->arr[chunk->useCount].val);
+
 	if (chunk->useCount == 0) {
 		_InterlockedIncrement((long*)&useCount);
 		chunk = ChunkAlloc();
 		TlsSetValue(tlsID, (void*)chunk);
 	}
-
-	--chunk->useCount;
-
-	if (chunk->useCount < 0) {
-		abort();
-	}
-
-	ret = &(chunk->arr[chunk->useCount].val);
 
 	if (newCall) {
 		new (ret)DATA;

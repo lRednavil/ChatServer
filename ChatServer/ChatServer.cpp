@@ -40,8 +40,6 @@ char redisIP[16] = "10.0.2.2";
 
 CTLSMemoryPool<PLAYER> g_playerPool;
 CTLSMemoryPool<REDIS_JOB> redisJobPool; 
-//CLockFreeMemoryPool<PLAYER> g_playerPool;
-//CLockFreeMemoryPool<REDIS_JOB> redisJobPool;
 
 ChatServer::ChatServer()
 {
@@ -182,7 +180,6 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
         switch (job.type) {
         case en_PACKET_CS_CHAT_REQ_LOGIN:
         {        
-            _FILE_LOG(LOG_LEVEL_DEBUG, L"Type_Log", L"Login");
             server->Recv_Login(job.sessionID, job.packet);
         }
         break;
@@ -579,15 +576,21 @@ unsigned int __stdcall ChatServer::RedisWork(void* arg)
         chatKey = std::to_string(job->player->accountNo) + ".Chat";
 
         redisTime = timeGetTime();
-        redis->get(chatKey, [&](cpp_redis::reply& reply) {
-            value = reply.as_string();
-            loginRes = memcmp(value.c_str(), job->player->sessionKey, 64) == 0;
-            });
-        redis->sync_commit();
+        std::future<cpp_redis::reply> redisFuture;
+        redisFuture = redis->get(chatKey);
+        redis->sync_commit(std::chrono::milliseconds(50));
+
+        cpp_redis::reply rep = redisFuture.get();
+        if (rep.is_string()) {
+            loginRes = memcmp(rep.as_string().c_str(), job->player->sessionKey, 64) == 0;
+        }
+        else {
+            loginRes = false;
+        }
 
         if (loginRes) {
             redis->del({ chatKey });
-            redis->sync_commit();
+            redis->sync_commit(std::chrono::milliseconds(50));
         }
 
         deltaTime = timeGetTime() - redisTime;
