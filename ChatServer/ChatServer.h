@@ -88,6 +88,7 @@ private:
 
 	int sectorCnt[50] = { 2500, };
 
+	HANDLE updateEvent;
 
 	//0 for update Thread
 	HANDLE hThreads;

@@ -32,13 +32,13 @@ CTLSMemoryPool<PLAYER> g_playerPool;
 
 ChatServer::ChatServer()
 {
-    
+    updateEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
 }
 
 ChatServer::~ChatServer()
 {
     isServerOn = false;
-
+    CloseHandle(updateEvent);
     WaitForSingleObject(hThreads, INFINITE);
 }
 
@@ -120,6 +120,8 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
         PacketFree(packet);
         Disconnect(sessionID);
     }
+
+    SetEvent(updateEvent);
 }
 
 void ChatServer::OnTimeOut(DWORD64 sessionID)
@@ -145,14 +147,15 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
     JOB job;
 
     while (server->isServerOn) {
-        server->updateCnt++;
-
+        WaitForSingleObject(server->updateEvent, INFINITE);
+        
         //쉬게 할 방법 추가 고민
         if (server->jobQ.Dequeue(&job) == false) {
-            Sleep(0);
+            ResetEvent(server->updateEvent);
             continue;
         }
 
+        server->updateCnt++;
 
         switch (job.type) {
         case en_PACKET_CS_CHAT_REQ_LOGIN:
@@ -331,7 +334,7 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     --sectorCnt[listSize];
     ++sectorCnt[listSize + 1];
 
-    sectorList[newSectorY][newSectorX].push_back(sessionID);
+    sectorList[newSectorY][newSectorX].emplace_back(sessionID);
 
     player->sectorX = newSectorX;
     player->sectorY = newSectorY;
