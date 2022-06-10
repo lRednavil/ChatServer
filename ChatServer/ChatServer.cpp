@@ -63,6 +63,7 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
     job.packet = NULL;
     
     jobQ.Enqueue(job);
+    SetEvent(updateEvent);
 
     return true;
 }
@@ -124,7 +125,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     SetEvent(updateEvent);
 }
 
-void ChatServer::OnTimeOut(DWORD64 sessionID)
+void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
 {
     JOB job;
 
