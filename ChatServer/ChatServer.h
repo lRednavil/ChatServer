@@ -17,8 +17,6 @@ struct PLAYER {
 
 	WORD sectorX;
 	WORD sectorY;
-
-	DWORD lastTime;
 };
 
 struct JOB {
@@ -84,6 +82,9 @@ private:
 	//메세지에서 L'='수신 카운트
 	DWORD64 logOutRecv = 0;
 	DWORD64 chatCnt = 0;
+
+	DWORD64 updateCnt = 0;
+	DWORD64 lastUpdateCnt = 0;
 
 	int sectorCnt[50] = { 2500, };
 

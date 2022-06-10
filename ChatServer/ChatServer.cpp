@@ -20,7 +20,7 @@
 #pragma comment (lib, "Winmm")
 
 #define PORT 11601
-#define MAX_CONNECT 10000
+#define MAX_CONNECT 17000
 
 #define TIME_OUT 40000
 
@@ -145,6 +145,8 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
     JOB job;
 
     while (server->isServerOn) {
+        server->updateCnt++;
+
         //쉬게 할 방법 추가 고민
         if (server->jobQ.Dequeue(&job) == false) {
             Sleep(0);
@@ -204,7 +206,10 @@ void ChatServer::ThreadInit()
 void ChatServer::ContentsMonitor()
 {
     wprintf_s(L"========= CONTENTS ========== \n");
+    wprintf_s(L"Update TPS : %llu || Left Update Message : %llu \n", updateCnt - lastUpdateCnt, jobQ.GetSize());
     wprintf_s(L"TimeOut : %llu || LogOut : %llu || Chat Recvd : %llu \n", timeOutCnt, logOutRecv, chatCnt);
+
+    lastUpdateCnt = updateCnt;
 
     //sector용
     int cnt;
