@@ -43,7 +43,7 @@ private:
 	//message 분석 역할
 	void OnRecv(DWORD64 sessionID, CPacket* packet);
 	
-	void OnTimeOut(DWORD64 sessionID);
+	void OnTimeOut(DWORD64 sessionID, int reason);
 
 	void OnError(int error, const WCHAR* msg);
 

@@ -183,7 +183,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     PacketFree(packet);
 }
 
-void ChatServer::OnTimeOut(DWORD64 sessionID)
+void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
 {
     DisconnectProc(sessionID);
 }
