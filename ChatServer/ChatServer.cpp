@@ -9,6 +9,7 @@
 #include "NetServer.h"
 #include "ChatServer.h"
 #include "SerializedBuffer.h"
+#include "Logging.h"
 
 #include "CommonProtocol.h"
 
@@ -17,75 +18,6 @@
 
 #pragma comment (lib, "NetworkLibrary")
 #pragma comment (lib, "Winmm")
-//LOG
-#pragma region LOG
-
-#define LOG_LEVEL_DEBUG 0
-#define LOG_LEVEL_SYSTEM 1
-#define LOG_LEVEL_ERROR 2
-
-int g_logLevel;
-WCHAR g_logBuf[1024];
-WCHAR g_logFileName[MAX_PATH];
-
-inline void Log(WCHAR* str, int logLevel) {
-    wprintf(L"%s \n", str);
-}
-
-inline void LogInit() {
-    SYSTEMTIME nowTime;
-
-    GetLocalTime(&nowTime);
-    wsprintf(g_logFileName, L"LOG\\LOG_%d%02d%02d_%02d.%02d.%02d",
-        nowTime.wYear, nowTime.wMonth, nowTime.wDay, nowTime.wHour, nowTime.wMinute, nowTime.wSecond);
-
-    _wmkdir(L"LOG");
-}
-
-inline void ErrorLog(const WCHAR* str) {
-    FILE* fp;
-    WCHAR fileName[MAX_PATH];
-    DWORD threadID = GetCurrentThreadId();
-
-    swprintf_s(fileName, L"%s_%u.txt",g_logFileName, threadID);
-       
-    _wfopen_s(&fp, fileName, L"at");
-    if (fp == NULL) return;
-
-    fwprintf_s(fp, str);
-    fwprintf_s(fp, L"\n");
-
-    fclose(fp);
-}
-
-inline void ErrorLog(const int err, const WCHAR* str) {
-    FILE* fp;
-    WCHAR fileName[MAX_PATH];
-    DWORD threadID = GetCurrentThreadId();
-
-    swprintf_s(fileName, L"%s_%u.txt", g_logFileName, threadID);
-
-    _wfopen_s(&fp, fileName, L"at");
-    if (fp == NULL) return;
-
-    fwprintf_s(fp, L"%d ", err);
-    fwprintf_s(fp, str);
-    fwprintf_s(fp, L"\n");
-
-    fclose(fp);
-}
-
-#define _LOG(LogLevel, fmt, ...)    \
-do{                                 \
-    if(g_logLevel <= LogLevel){     \
-        wsprintf(g_logBuf, fmt, ##__VA_ARGS__);  \
-        Log(g_logBuf, LogLevel);                 \
-    }                                            \
-}while(0)                                    
-
-
-
-#pragma endregion
 
 #define PORT 11601
 #define MAX_CONNECT 17000
@@ -190,10 +122,7 @@ void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
 
 void ChatServer::OnError(int error, const WCHAR* msg)
 {
-    if (error != -1) {
-        ErrorLog(error, msg);
-    }
-    else ErrorLog(msg);
+
 }
 
 void ChatServer::ThreadInit()
