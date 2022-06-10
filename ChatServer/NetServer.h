@@ -89,7 +89,7 @@ protected:
 	DWORD64 lastAccept = 0;
 	DWORD64 lastSend = 0;
 	DWORD64 lastRecv = 0;
-
+	
 	DWORD64 recvBytes = 0;
 	DWORD64 sendBytes = 0;
 
