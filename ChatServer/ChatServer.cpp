@@ -88,7 +88,7 @@ do{                                 \
 #pragma endregion
 
 #define PORT 11601
-#define MAX_CONNECT 10000
+#define MAX_CONNECT 17000
 
 #define TIME_OUT 40000
 
