@@ -18,10 +18,10 @@
     <ClCompile Include="ChatServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="Dump.cpp">
+    <ClCompile Include="TimeTracker.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="TimeTracker.cpp">
+    <ClCompile Include="Dump.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

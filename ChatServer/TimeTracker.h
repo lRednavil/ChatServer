@@ -23,8 +23,8 @@ public:
 
 #ifdef PROFILE_MODE
 #define PROFILE_START(X) CTimeTracker(X)
-#define PROFILE_RESET() ResetTimeTrack()
-#define PROFILE_WRITE() WriteTimeTrack()
+#define PROFILE_RESET() CTimeTracker::ResetTimeTrack()
+#define PROFILE_WRITE() CTimeTracker::WriteTimeTrack()
 #else
 #define PROFILE_START(X)
 #define PROFILE_RESET()
