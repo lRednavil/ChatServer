@@ -15,6 +15,8 @@
 //에러 처리용 덤프와 로깅
 #include "Dump.h"
 #include "Logging.h"
+
+#define PROFILE_MODE
 #include "TimeTracker.h"
 
 #pragma comment (lib, "NetworkLibrary")
@@ -51,6 +53,7 @@ bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
 
 bool ChatServer::OnClientJoin(DWORD64 sessionID)
 {
+    PROFILE_START(OnJoin);
     SetTimeOut(sessionID, TIME_OUT);
     //임시로 무조건 승인중
     return true;
@@ -58,6 +61,7 @@ bool ChatServer::OnClientJoin(DWORD64 sessionID)
 
 bool ChatServer::OnClientLeave(DWORD64 sessionID)
 {
+    PROFILE_START(OnLeave);
     JOB job;
     job.type = en_SERVER_DISCONNECT;
     job.sessionID = sessionID;
@@ -71,6 +75,7 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
 
 void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 {
+    PROFILE_START(OnRecv);
     WORD type;
     JOB job;
 
@@ -248,7 +253,7 @@ void ChatServer::ContentsMonitor()
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(L"Recv_Login");
+    PROFILE_START(Recv_Login);
     //packet 추출
     PLAYER* player = g_playerPool.Alloc();
     *packet >> player->accountNo;
@@ -283,7 +288,7 @@ void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
 
 void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(L"Recv_SectorMove");
+    PROFILE_START(Recv_SectorMove);
     PLAYER* player;
     INT64 accountNo;
     WORD newSectorX;
@@ -357,7 +362,7 @@ void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 
 void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(L"Recv_Chat");
+    PROFILE_START(Recv_Chat);
     PLAYER* player;
     INT64 accountNo;
     WORD msgLen;
@@ -542,7 +547,9 @@ int main()
         g_ChatServer.ContentsMonitor();
         logCnt++;
         if (logCnt & 0x40) {
+            logCnt ^= 0x40;
             PROFILE_WRITE();
+            PROFILE_RESET();
         }
 
         Sleep(1000);
