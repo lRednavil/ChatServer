@@ -16,7 +16,7 @@
 #include "Dump.h"
 #include "Logging.h"
 
-#define PROFILE_MODE
+//#define PROFILE_MODE
 #include "TimeTracker.h"
 
 #pragma comment (lib, "NetworkLibrary")
@@ -32,6 +32,7 @@ ChatServer g_ChatServer;
 WCHAR IP[16] = L"0.0.0.0";
 
 CTLSMemoryPool<PLAYER> g_playerPool;
+CTLSMemoryPool<JOB> g_jobPool;
 
 ChatServer::ChatServer()
 {
@@ -60,10 +61,10 @@ bool ChatServer::OnClientJoin(DWORD64 sessionID)
 
 bool ChatServer::OnClientLeave(DWORD64 sessionID)
 {
-    JOB job;
-    job.type = en_SERVER_DISCONNECT;
-    job.sessionID = sessionID;
-    job.packet = NULL;
+    JOB* job = g_jobPool.Alloc();
+    job->type = en_SERVER_DISCONNECT;
+    job->sessionID = sessionID;
+    job->packet = NULL;
     
     jobQ.Enqueue(job);
     SetEvent(updateEvent);
@@ -74,16 +75,16 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
 void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 {
     WORD type;
-    JOB job;
+    JOB* job = g_jobPool.Alloc();
 
     *packet >> type;
    
     switch (type) {
     case en_PACKET_CS_CHAT_REQ_LOGIN:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
-        job.sessionID = sessionID;
-        job.packet = packet;
+        job->type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job->sessionID = sessionID;
+        job->packet = packet;
 
         jobQ.Enqueue(job);
     }
@@ -91,9 +92,9 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE: 
     {
-        job.type = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
-        job.sessionID = sessionID;
-        job.packet = packet;
+        job->type = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
+        job->sessionID = sessionID;
+        job->packet = packet;
 
         jobQ.Enqueue(job);
     }
@@ -101,9 +102,9 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_MESSAGE:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_MESSAGE;
-        job.sessionID = sessionID;
-        job.packet = packet;
+        job->type = en_PACKET_CS_CHAT_REQ_MESSAGE;
+        job->sessionID = sessionID;
+        job->packet = packet;
 
         jobQ.Enqueue(job);
     }
@@ -111,9 +112,10 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
     {
-        //job.type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
-        //job.sessionID = sessionID;
-        //job.packet = packet;
+        g_jobPool.Free(job);
+        //job->type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
+        //job->sessionID = sessionID;
+        //job->packet = packet;
 
         //jobQ.Enqueue(job);
     }
@@ -122,6 +124,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     default:
         //_FILE_LOG(LOG_LEVEL_ERROR, L"ContentsLog", L"Packet Type Error");
         PacketFree(packet);
+        g_jobPool.Free(job);
         Disconnect(sessionID);
     }
 
@@ -130,11 +133,11 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
 {
-    JOB job;
+    JOB* job = g_jobPool.Alloc();
 
-    job.type = en_SERVER_DISCONNECT;
-    job.sessionID = sessionID;
-    job.packet = NULL;
+    job->type = en_SERVER_DISCONNECT;
+    job->sessionID = sessionID;
+    job->packet = NULL;
     
     jobQ.Enqueue(job);
     OnError(timeOutCnt++, L"Time Out!!");
@@ -148,55 +151,64 @@ void ChatServer::OnError(int error, const WCHAR* msg)
 unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
 {
     ChatServer* server = (ChatServer*)arg;
-    JOB job;
+    JOB* job;
 
     while (server->isServerOn) {
-        WaitForSingleObject(server->updateEvent, INFINITE);
-        
-        //쉬게 할 방법 추가 고민
-        if (server->jobQ.Dequeue(&job) == false) {
-            ResetEvent(server->updateEvent);
-            continue;
-        }
-
-        server->updateCnt++;
-
-        switch (job.type) {
-        case en_PACKET_CS_CHAT_REQ_LOGIN:
-        {        
-            server->Recv_Login(job.sessionID, job.packet);
-        }
-        break;
-
-        case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
         {
-            server->Recv_SectorMove(job.sessionID, job.packet);
-        }
-        break;
+            WaitForSingleObject(server->updateEvent, INFINITE);
+          
+            //쉬게 할 방법 추가 고민
+            if (server->jobQ.Dequeue(&job) == false) {
+                ResetEvent(server->updateEvent);
+                continue;
+            }
 
-        case en_PACKET_CS_CHAT_REQ_MESSAGE:
-        {        
-            server->Recv_Message(job.sessionID, job.packet);
-        }
-        break;
+            server->updateCnt++;
 
-        case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-        {
-            //지금 당장은 함수 Call의 이유가 없음
-            //server->Recv_HeartBeat(job.sessionID, job.packet);
-        }
-        break;
-        case en_SERVER_DISCONNECT:
-        {
-            server->DisconnectProc(job.sessionID);
-        }
-        break;
-        default:
-            server->Disconnect(job.sessionID);
-        }
+            switch (job->type) {
+            case en_PACKET_CS_CHAT_REQ_LOGIN:
+            {
+                PROFILE_START(Login);
+                server->Recv_Login(job->sessionID, job->packet);
+            }
+            break;
 
-        if (job.packet != NULL) {
-            server->PacketFree(job.packet);
+            case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+            {
+                PROFILE_START(SectorMove);
+                server->Recv_SectorMove(job->sessionID, job->packet);
+            }
+            break;
+
+            case en_PACKET_CS_CHAT_REQ_MESSAGE:
+            {
+                PROFILE_START(RecvMsg);
+                server->Recv_Message(job->sessionID, job->packet);
+            }
+            break;
+
+            case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
+            {
+                //지금 당장은 함수 Call의 이유가 없음
+                //server->Recv_HeartBeat(job->sessionID, job->packet);
+            }
+            break;
+            case en_SERVER_DISCONNECT:
+            {
+                PROFILE_START(DisconnectProc);
+                server->DisconnectProc(job->sessionID);
+            }
+            break;
+            default:
+                server->Disconnect(job->sessionID);
+            }
+
+            if (job->packet != NULL) {
+                PROFILE_START(PacketFree);
+                server->PacketFree(job->packet);
+            }
+
+            g_jobPool.Free(job);
         }
     }
 
@@ -222,29 +234,6 @@ void ChatServer::ContentsMonitor()
     int cnt;
     int lim;
     int idx = 0;
-
-    wprintf_s(L"Max Sectors : ");
-    lim = 10;
-	for (idx = 49; idx >= 0; --idx) {
-		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
-			wprintf_s(L"%d  ", idx);
-		}
-		lim -= sectorCnt[idx];
-        if (lim <= 0) break;
-	}
-	wprintf_s(L"\n");
-
-	wprintf_s(L"Min Sectors : ");
-	lim = 10;
-	for (idx = 0; idx < 50; ++idx) {
-		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
-			wprintf_s(L"%d  ", idx);
-		}
-		lim -= sectorCnt[idx];
-        if (lim <= 0) break;
-	}
-    wprintf_s(L"\n");
-
 
 }
 
@@ -315,11 +304,6 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     else {
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
-                //mointor용
-                listSize = sectorList[player->sectorY][player->sectorX].size();
-                --sectorCnt[listSize];
-                ++sectorCnt[listSize - 1];
-
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
             }
@@ -333,11 +317,6 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         return;
     }
     
-    //mointor용
-    listSize = sectorList[newSectorY][newSectorX].size();
-    --sectorCnt[listSize];
-    ++sectorCnt[listSize + 1];
-
     sectorList[newSectorY][newSectorX].emplace_back(sessionID);
 
     player->sectorX = newSectorX;
@@ -469,19 +448,17 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 		//WORD이므로 -1 => 65535
 		if (sectorY >= SECTOR_Y_MAX)
 			continue;
+
 		for (cntX = -1; cntX <= 1; ++cntX) {
 			sectorX = player->sectorX + cntX;
 			if (sectorX >= SECTOR_X_MAX)
 				continue;
+
 			//packet addref처리
 			packet->AddRef(sectorList[sectorY][sectorX].size());
-			{
-				PROFILE_START(SendPacket_LOOP);
-				//각 session에 sendpacket
-				for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                    PROFILE_START(SendPacket_ITSELF);
-                    SendPacket(*itr, packet);
-				}
+			//각 session에 sendpacket
+			for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
+                SendPacket(sessionID, packet);
 			}
 		}
 	}
@@ -512,8 +489,6 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
             if (*itr == sessionID) {
                 //mointor용
                 listSize = sectorList[player->sectorY][player->sectorX].size();
-                --sectorCnt[listSize];
-                ++sectorCnt[listSize - 1];
 
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
