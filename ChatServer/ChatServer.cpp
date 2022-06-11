@@ -53,7 +53,6 @@ bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
 
 bool ChatServer::OnClientJoin(DWORD64 sessionID)
 {
-    PROFILE_START(OnJoin);
     SetTimeOut(sessionID, TIME_OUT);
     //임시로 무조건 승인중
     return true;
@@ -61,7 +60,6 @@ bool ChatServer::OnClientJoin(DWORD64 sessionID)
 
 bool ChatServer::OnClientLeave(DWORD64 sessionID)
 {
-    PROFILE_START(OnLeave);
     JOB job;
     job.type = en_SERVER_DISCONNECT;
     job.sessionID = sessionID;
@@ -75,7 +73,6 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
 
 void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(OnRecv);
     WORD type;
     JOB job;
 
@@ -253,7 +250,6 @@ void ChatServer::ContentsMonitor()
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(Recv_Login);
     //packet 추출
     PLAYER* player = g_playerPool.Alloc();
     *packet >> player->accountNo;
@@ -288,7 +284,6 @@ void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
 
 void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(Recv_SectorMove);
     PLAYER* player;
     INT64 accountNo;
     WORD newSectorX;
@@ -362,7 +357,6 @@ void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 
 void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(Recv_Chat);
     PLAYER* player;
     INT64 accountNo;
     WORD msgLen;
@@ -470,25 +464,27 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
-    for (cntY = -1; cntY <= 1; ++cntY) {
-        sectorY = player->sectorY + cntY;
-        //WORD이므로 -1 => 65535
-        if (sectorY >= SECTOR_Y_MAX)
-            continue;
-
-        for (cntX = -1; cntX <= 1; ++cntX) {
-            sectorX = player->sectorX + cntX;
-            if (sectorX >= SECTOR_X_MAX)
-                continue;
-
-            //packet addref처리
-            packet->AddRef(sectorList[sectorY][sectorX].size());
-            //각 session에 sendpacket
-            for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                SendPacket(*itr, packet);
-            }
-        }
-    }
+	for (cntY = -1; cntY <= 1; ++cntY) {
+		sectorY = player->sectorY + cntY;
+		//WORD이므로 -1 => 65535
+		if (sectorY >= SECTOR_Y_MAX)
+			continue;
+		for (cntX = -1; cntX <= 1; ++cntX) {
+			sectorX = player->sectorX + cntX;
+			if (sectorX >= SECTOR_X_MAX)
+				continue;
+			//packet addref처리
+			packet->AddRef(sectorList[sectorY][sectorX].size());
+			{
+				PROFILE_START(SendPacket_LOOP);
+				//각 session에 sendpacket
+				for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
+                    PROFILE_START(SendPacket_ITSELF);
+                    SendPacket(*itr, packet);
+				}
+			}
+		}
+	}
 
     //본인 포함 send로 packetRef 1 초과
     PacketFree(packet);
