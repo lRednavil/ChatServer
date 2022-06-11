@@ -21,36 +21,18 @@
     <ClCompile Include="Dump.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="TimeTracker.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="TLSMemoryPool.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="LockFreeMemoryPool.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="LockFreeQueue.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="LockFreeStack.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="NetServer.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="CommonProtocol.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="ChatServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Dump.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="SerializedBuffer.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Logging.h">
+    <ClInclude Include="TimeTracker.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
