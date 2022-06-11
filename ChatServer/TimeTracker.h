@@ -17,6 +17,9 @@ public:
 	static void WriteTimeTrack();
 
 	static void ResetTimeTrack();
+
+private:
+	int trackIdx;
 };
 
 #define PROFILE_MODE

@@ -37,7 +37,6 @@ THREADTRACK g_threadTrack[THREAD_MAX];
 
 short g_threadIdx = 0;
 DWORD threadTLS = TlsAlloc();
-DWORD trackTLS = TlsAlloc();
 
 CTimeTracker::CTimeTracker(const WCHAR* name)
 {
@@ -54,6 +53,7 @@ CTimeTracker::CTimeTracker(const WCHAR* name)
 	for (trackIdx = 0; trackIdx < TRACK_MAX; trackIdx++) {
 		track = &g_threadTrack[threadIdx].record[trackIdx];
 		if (track->isAlive == false) {
+			track->isAlive = true;
 			track->callCnt = 0;
 			track->minTime.QuadPart = MAXLONGLONG;
 			track->maxTime.QuadPart = 0;
@@ -66,7 +66,7 @@ CTimeTracker::CTimeTracker(const WCHAR* name)
 	}
 
 	if (trackIdx < TRACK_MAX) {
-		TlsSetValue(trackTLS, (void*)trackIdx);
+		this->trackIdx = trackIdx;
 		StartTimeTrack();
 	}
 
@@ -74,7 +74,6 @@ CTimeTracker::CTimeTracker(const WCHAR* name)
 
 void CTimeTracker::StartTimeTrack() {
 	short threadIdx = (short)TlsGetValue(threadTLS) - 1;
-	int trackIdx = (int)TlsGetValue(trackTLS);
 
 	QueryPerformanceCounter(&g_threadTrack[threadIdx].record[trackIdx].startTime);
 }
@@ -153,34 +152,34 @@ void CTimeTracker::EndTimeTrack() {
 	QueryPerformanceCounter(&endTime);
 
 	short threadIdx = (short)TlsGetValue(threadTLS) - 1;
-	int trackIdx = (int)TlsGetValue(trackTLS);
+	TIMETRACK* track;
 
 	//저장용 예외처리
 	if (threadIdx < 0) return;
 
+	track = &g_threadTrack[threadIdx].record[trackIdx];
+
 	LARGE_INTEGER deltaTime;
-	deltaTime.QuadPart = endTime.QuadPart - g_threadTrack[threadIdx].record[trackIdx].startTime.QuadPart;
+	deltaTime.QuadPart = endTime.QuadPart - track->startTime.QuadPart;
 
-	g_threadTrack[threadIdx].record[trackIdx].totalTime.QuadPart += deltaTime.QuadPart;
+	track->totalTime.QuadPart += deltaTime.QuadPart;
 
-	g_threadTrack[threadIdx].record[trackIdx].minTime.QuadPart = min(g_threadTrack[threadIdx].record[trackIdx].minTime.QuadPart, deltaTime.QuadPart);
-	g_threadTrack[threadIdx].record[trackIdx].maxTime.QuadPart = max(g_threadTrack[threadIdx].record[trackIdx].maxTime.QuadPart, deltaTime.QuadPart);
+	track->minTime.QuadPart = min(track->minTime.QuadPart, deltaTime.QuadPart);
+	track->maxTime.QuadPart = max(track->maxTime.QuadPart, deltaTime.QuadPart);
 
-	g_threadTrack[threadIdx].record[trackIdx].callCnt++;
+	track->callCnt++;
 }
 
 
 //file함수에 사용할 fileName 작성 함수
 void CTimeTracker::MakeFileName() {
-	if (wcscmp(timeStr, L"") == 0) {
-		time_t _time;
-		tm _tm;
-		
-		time(&_time);
-		localtime_s(&_tm, &_time);
+	time_t _time;
+	tm _tm;
 
-		swprintf_s(timeStr, L"TimeInfo%d%02d%02d_%02d%02d%02d", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
-	}
+	time(&_time);
+	localtime_s(&_tm, &_time);
+
+	swprintf_s(timeStr, L"TimeInfo%d%02d%02d_%02d%02d%02d", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
 
 	wmemmove_s(fileName, 50, fileDir, 50);
 	wcscat_s(fileName, timeStr);
