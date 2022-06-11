@@ -15,6 +15,7 @@
 //에러 처리용 덤프와 로깅
 #include "Dump.h"
 #include "Logging.h"
+#include "TimeTracker.h"
 
 #pragma comment (lib, "NetworkLibrary")
 #pragma comment (lib, "Winmm")
@@ -238,6 +239,7 @@ void ChatServer::ContentsMonitor()
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
+    PROFILE_START(L"Recv_Login");
     //packet 추출
     PLAYER* player = g_playerPool.Alloc();
     *packet >> player->accountNo;
@@ -272,6 +274,7 @@ void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
 
 void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 {
+    PROFILE_START(L"Recv_SectorMove");
     PLAYER* player;
     INT64 accountNo;
     WORD newSectorX;
@@ -345,6 +348,7 @@ void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 
 void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 {
+    PROFILE_START(L"Recv_Chat");
     PLAYER* player;
     INT64 accountNo;
     WORD msgLen;
