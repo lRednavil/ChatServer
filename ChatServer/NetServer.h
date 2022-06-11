@@ -1,6 +1,7 @@
 #pragma once
 struct SESSION;
 class CPacket;
+
 class CProcessMonitor;
 class CProcessorMonitor;
 
@@ -16,12 +17,14 @@ public:
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
+	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet);
+	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal);
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
 
-	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
 
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
@@ -34,7 +37,7 @@ public:
 	//메세지 헤더는 알아서 검증할 것
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
 
-	virtual void OnTimeOut(DWORD64 sessionID) = 0;
+	virtual void OnTimeOut(DWORD64 sessionID, int reason) = 0;
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
@@ -76,18 +79,19 @@ private:
 protected:
 	//sessionID 겸용
 	DWORD64 totalAccept = 0;
+	alignas(64)
 	DWORD64 totalSend = 0;
+	alignas(64)
 	DWORD64 totalRecv = 0;
-	DWORD64 totalRelease = 0;
 	//tps측정용 기억
+	alignas(64)
 	DWORD64 lastAccept = 0;
 	DWORD64 lastSend = 0;
 	DWORD64 lastRecv = 0;
-	DWORD64 lastRelease = 0;
 
 	DWORD64 recvBytes = 0;
 	DWORD64 sendBytes = 0;
-	
+
 	//시간 기억
 	DWORD currentTime;
 

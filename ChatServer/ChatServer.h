@@ -17,8 +17,6 @@ struct PLAYER {
 
 	WORD sectorX;
 	WORD sectorY;
-
-	DWORD lastTime;
 };
 
 struct JOB {
@@ -49,7 +47,7 @@ private:
 	//message 분석 역할
 	void OnRecv(DWORD64 sessionID, CPacket* packet);
 	
-	void OnTimeOut(DWORD64 sessionID);
+	void OnTimeOut(DWORD64 sessionID, int reason);
 
 	void OnError(int error, const WCHAR* msg);
 
@@ -85,8 +83,12 @@ private:
 	DWORD64 logOutRecv = 0;
 	DWORD64 chatCnt = 0;
 
+	DWORD64 updateCnt = 0;
+	DWORD64 lastUpdateCnt = 0;
+
 	int sectorCnt[50] = { 2500, };
 
+	HANDLE updateEvent;
 
 	//0 for update Thread
 	HANDLE hThreads;

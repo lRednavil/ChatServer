@@ -21,7 +21,7 @@
 #pragma comment (lib, "Winmm")
 
 #define PORT 11601
-#define MAX_CONNECT 10000
+#define MAX_CONNECT 17000
 
 #define TIME_OUT 40000
 
@@ -33,13 +33,13 @@ CTLSMemoryPool<PLAYER> g_playerPool;
 
 ChatServer::ChatServer()
 {
-    
+    updateEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
 }
 
 ChatServer::~ChatServer()
 {
     isServerOn = false;
-
+    CloseHandle(updateEvent);
     WaitForSingleObject(hThreads, INFINITE);
 }
 
@@ -64,6 +64,7 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
     job.packet = NULL;
     
     jobQ.Enqueue(job);
+    SetEvent(updateEvent);
 
     return true;
 }
@@ -121,9 +122,11 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
         PacketFree(packet);
         Disconnect(sessionID);
     }
+
+    SetEvent(updateEvent);
 }
 
-void ChatServer::OnTimeOut(DWORD64 sessionID)
+void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
 {
     JOB job;
 
@@ -146,12 +149,15 @@ unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
     JOB job;
 
     while (server->isServerOn) {
+        WaitForSingleObject(server->updateEvent, INFINITE);
+        
         //쉬게 할 방법 추가 고민
         if (server->jobQ.Dequeue(&job) == false) {
-            Sleep(0);
+            ResetEvent(server->updateEvent);
             continue;
         }
 
+        server->updateCnt++;
 
         switch (job.type) {
         case en_PACKET_CS_CHAT_REQ_LOGIN:
@@ -205,7 +211,10 @@ void ChatServer::ThreadInit()
 void ChatServer::ContentsMonitor()
 {
     wprintf_s(L"========= CONTENTS ========== \n");
+    wprintf_s(L"Update TPS : %llu || Left Update Message : %llu \n", updateCnt - lastUpdateCnt, jobQ.GetSize());
     wprintf_s(L"TimeOut : %llu || LogOut : %llu || Chat Recvd : %llu \n", timeOutCnt, logOutRecv, chatCnt);
+
+    lastUpdateCnt = updateCnt;
 
     //sector용
     int cnt;
@@ -329,7 +338,7 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
     --sectorCnt[listSize];
     ++sectorCnt[listSize + 1];
 
-    sectorList[newSectorY][newSectorX].push_back(sessionID);
+    sectorList[newSectorY][newSectorX].emplace_back(sessionID);
 
     player->sectorX = newSectorX;
     player->sectorY = newSectorY;
