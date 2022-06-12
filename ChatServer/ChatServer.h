@@ -52,7 +52,8 @@ private:
 	void OnError(int error, const WCHAR* msg);
 
 //chatserver 전용 함수 영역
-	static unsigned int __stdcall _UpdateThread(void* arg);
+	static unsigned int __stdcall UpdateThread(void* arg);
+	void _UpdateThread();
 
 	//모든 Recv함수는 PacketFree할 것
 	//playerMap 삽입

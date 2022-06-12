@@ -145,81 +145,88 @@ void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
 
 void ChatServer::OnError(int error, const WCHAR* msg)
 {
-    _LOG(LOG_LEVEL_ERROR, msg);
+    //_LOG(LOG_LEVEL_ERROR, msg);
 }
 
-unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
+unsigned int __stdcall ChatServer::UpdateThread(void* arg)
 {
     ChatServer* server = (ChatServer*)arg;
+    server->_UpdateThread();
+
+    return 0;
+}
+
+void ChatServer::_UpdateThread()
+{
     JOB* job;
 
-    while (server->isServerOn) {
+    while (isServerOn) {
         {
-            WaitForSingleObject(server->updateEvent, INFINITE);
-          
+            WaitForSingleObject(updateEvent, INFINITE);
+            PROFILE_START(_Update);
+
             //쉬게 할 방법 추가 고민
-            if (server->jobQ.Dequeue(&job) == false) {
-                ResetEvent(server->updateEvent);
+            if (jobQ.Dequeue(&job) == false) {
+                ResetEvent(updateEvent);
                 continue;
             }
 
-            server->updateCnt++;
+            updateCnt++;
 
             switch (job->type) {
             case en_PACKET_CS_CHAT_REQ_LOGIN:
             {
                 PROFILE_START(Login);
-                server->Recv_Login(job->sessionID, job->packet);
+                Recv_Login(job->sessionID, job->packet);
             }
             break;
 
             case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
             {
                 PROFILE_START(SectorMove);
-                server->Recv_SectorMove(job->sessionID, job->packet);
+                Recv_SectorMove(job->sessionID, job->packet);
             }
             break;
 
             case en_PACKET_CS_CHAT_REQ_MESSAGE:
             {
                 PROFILE_START(RecvMsg);
-                server->Recv_Message(job->sessionID, job->packet);
+                Recv_Message(job->sessionID, job->packet);
             }
             break;
 
             case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
             {
                 //지금 당장은 함수 Call의 이유가 없음
-                //server->Recv_HeartBeat(job->sessionID, job->packet);
+                //Recv_HeartBeat(job->sessionID, job->packet);
             }
             break;
             case en_SERVER_DISCONNECT:
             {
                 PROFILE_START(DisconnectProc);
-                server->DisconnectProc(job->sessionID);
+                DisconnectProc(job->sessionID);
             }
             break;
             default:
-                server->Disconnect(job->sessionID);
+                Disconnect(job->sessionID);
             }
 
             if (job->packet != NULL) {
                 PROFILE_START(PacketFree);
-                server->PacketFree(job->packet);
+                PacketFree(job->packet);
             }
 
             g_jobPool.Free(job);
         }
     }
 
-    return 0;
 }
 
 void ChatServer::ThreadInit()
 {
     isServerOn = true;
 
-    hThreads = (HANDLE)_beginthreadex(NULL, 0, _UpdateThread, this, NULL, 0);
+    hThreads = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, NULL, 0);
 }
 
 void ChatServer::ContentsMonitor()
@@ -425,6 +432,7 @@ void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 {
+    PROFILE_START(SendAround);
     PLAYER* player;
     WORD sectorY;
     WORD sectorX;
@@ -458,7 +466,7 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 			packet->AddRef(sectorList[sectorY][sectorX].size());
 			//각 session에 sendpacket
 			for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                SendPacket(sessionID, packet);
+                SendPacket(*itr, packet);
 			}
 		}
 	}
