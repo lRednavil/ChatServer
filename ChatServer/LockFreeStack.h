@@ -100,7 +100,7 @@ inline bool CLockFreeStack<DATA>::Pop(DATA* val)
 	}
 
 	//*val = tVal->val;
-	memmove_s(val, sizeof(DATA), &tVal->val, sizeof(DATA));
+	memmove(val, &tVal->val, sizeof(DATA));
 	memPool.Free(tVal);
 
 	_InterlockedDecrement(&size);

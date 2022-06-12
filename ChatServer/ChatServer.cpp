@@ -433,23 +433,13 @@ void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 {
     PROFILE_START(SendAround);
-    PLAYER* player;
+    PLAYER* player = playerMap[sessionID];
     WORD sectorY;
     WORD sectorX;
     char cntY;
     char cntX;
-    //디버그용
-    PLAYER* temp;
+    
     std::list<DWORD64>::iterator itr;
-
-    //find player
-    if (playerMap.find(sessionID) != playerMap.end()) {
-        player = playerMap[sessionID];
-    }
-    else {
-        Disconnect(sessionID);
-        return;
-    }
 
 	for (cntY = -1; cntY <= 1; ++cntY) {
 		sectorY = player->sectorY + cntY;
@@ -466,7 +456,12 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 			packet->AddRef(sectorList[sectorY][sectorX].size());
 			//각 session에 sendpacket
 			for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                SendPacket(*itr, packet);
+                if (*itr == sessionID) {
+                    SendPacket(*itr, packet);
+                }
+                else {
+                    SendEnQ(*itr, packet);
+                }
 			}
 		}
 	}

@@ -119,7 +119,7 @@ inline bool CLockFreeQueue<DATA>::Dequeue(DATA* val)
 
 		if (InterlockedCompareExchange64((long long*)&headNode, (long long)next, (long long)head) == (long long)head) {
 			//*val = nextVal->val;
-			memmove_s(val, sizeof(DATA), &nextVal->val, sizeof(DATA));
+			memmove(val, &nextVal->val, sizeof(DATA));
 			memPool.Free(headVal);
 			return true;
 		}
