@@ -31,6 +31,7 @@ public:
 	ChatServer();
 	~ChatServer();
 
+	void Init();
 	void ThreadInit();
 	
 	void ContentsMonitor();

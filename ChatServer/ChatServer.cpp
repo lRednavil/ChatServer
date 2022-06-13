@@ -22,14 +22,17 @@
 #pragma comment (lib, "NetworkLibrary")
 #pragma comment (lib, "Winmm")
 
-#define PORT 11601
-#define MAX_CONNECT 17000
-
 #define TIME_OUT 40000
 
 CDump dump;
 ChatServer g_ChatServer;
+
 WCHAR IP[16] = L"0.0.0.0";
+DWORD PORT;
+DWORD createThreads;
+DWORD runningThreads;
+bool isNagle;
+DWORD maxConnect;
 
 CTLSMemoryPool<PLAYER> g_playerPool;
 CTLSMemoryPool<JOB> g_jobPool;
@@ -46,6 +49,25 @@ ChatServer::~ChatServer()
     WaitForSingleObject(hThreads, INFINITE);
 }
 
+
+void ChatServer::Init()
+{
+    int x = GetPrivateProfileInt(L"test", L"x", NULL, L".//ServerSettings.ini");
+    GetPrivateProfileString(L"ChatServer", L"IP", L"0.0.0.0", IP, wcslen(IP), L".//ServerSettings.ini");
+    PORT = GetPrivateProfileInt(L"ChatServer", L"PORT", NULL, L".//ServerSettings.ini");
+    createThreads = GetPrivateProfileInt(L"ChatServer", L"CreateThreads", NULL, L".//ServerSettings.ini");
+    runningThreads = GetPrivateProfileInt(L"ChatServer", L"RunningThreads", NULL, L".//ServerSettings.ini");
+    isNagle = GetPrivateProfileInt(L"ChatServer", L"isNagle", NULL, L".//ServerSettings.ini");
+    maxConnect = GetPrivateProfileInt(L"ChatServer", L"MaxConnect", NULL, L".//ServerSettings.ini");
+
+    if ((PORT * createThreads * runningThreads * maxConnect) == 0) {
+        _FILE_LOG(LOG_LEVEL_ERROR, L"INIT_LOG", L"INVALID ARGUMENTS or No ini FILE");
+        CRASH();
+    }
+
+    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect);
+    ThreadInit();
+}
 
 bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
 {
@@ -508,9 +530,8 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
 int main()
 {
     LogInit();
-	g_ChatServer.Start(IP, PORT, 4, 4, true, MAX_CONNECT);
-    g_ChatServer.ThreadInit();
-
+    g_ChatServer.Init();
+	
     timeBeginPeriod(1);
 
     int logCnt = 0;
