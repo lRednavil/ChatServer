@@ -132,6 +132,7 @@
       <ConformanceMode>true</ConformanceMode>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -148,7 +149,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatServer.h" />
-    <ClInclude Include="CommonHeaders.h" />
+    <ClInclude Include="stdafx.h" />
     <ClInclude Include="TimeTracker.h" />
     <ClInclude Include="CommonProtocol.h" />
   </ItemGroup>

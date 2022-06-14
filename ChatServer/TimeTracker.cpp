@@ -1,4 +1,5 @@
-﻿#include <iostream>
+﻿#include "stdafx.h"
+#include <iostream>
 #include <time.h>
 #include <direct.h>
 #include <thread>

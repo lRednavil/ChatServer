@@ -1,4 +1,4 @@
-#include "CommonHeaders.h"
+#include "stdafx.h"
 
 WCHAR IP[16] = L"0.0.0.0";
 DWORD PORT;

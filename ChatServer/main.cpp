@@ -1,4 +1,5 @@
-﻿#include "CommonHeaders.h"
+﻿#include "stdafx.h"
+
 
 CDump dump;
 ChatServer g_ChatServer;
