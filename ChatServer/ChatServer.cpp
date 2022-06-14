@@ -1,31 +1,4 @@
-ï»¿#include <iostream>
-#include <Windows.h>
-#include <direct.h>
-
-#include "LockFreeMemoryPool.h"
-#include "LockFreeQueue.h"
-#include "LockFreeStack.h"
-#include "TLSMemoryPool.h"
-#include "NetServer.h"
-#include "ChatServer.h"
-#include "SerializedBuffer.h"
-
-#include "CommonProtocol.h"
-
-//ì—ëŸ¬ ì²˜ë¦¬ìš© ë¤í”„ì™€ ë¡œê¹…
-#include "Dump.h"
-#include "Logging.h"
-
-//#define PROFILE_MODE
-#include "TimeTracker.h"
-
-#pragma comment (lib, "NetworkLibrary")
-#pragma comment (lib, "Winmm")
-
-#define TIME_OUT 40000
-
-CDump dump;
-ChatServer g_ChatServer;
+#include "CommonHeaders.h"
 
 WCHAR IP[16] = L"0.0.0.0";
 DWORD PORT;
@@ -70,13 +43,13 @@ void ChatServer::Init()
 
 bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
 {
-	return true;
+    return true;
 }
 
 bool ChatServer::OnClientJoin(DWORD64 sessionID)
 {
-    SetTimeOut(sessionID, TIME_OUT);
-    //ì„ì‹œë¡œ ë¬´ì¡°ê±´ ìŠ¹ì¸ì¤‘
+    SetTimeOut(sessionID, 40000);
+    //ÀÓ½Ã·Î ¹«Á¶°Ç ½ÂÀÎÁß
     return true;
 }
 
@@ -86,7 +59,7 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
     job->type = en_SERVER_DISCONNECT;
     job->sessionID = sessionID;
     job->packet = NULL;
-    
+
     jobQ.Enqueue(job);
     SetEvent(updateEvent);
 
@@ -99,7 +72,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     JOB* job = g_jobPool.Alloc();
 
     *packet >> type;
-   
+
     switch (type) {
     case en_PACKET_CS_CHAT_REQ_LOGIN:
     {
@@ -109,9 +82,9 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
         jobQ.Enqueue(job);
     }
-        break;
+    break;
 
-    case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE: 
+    case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
     {
         job->type = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
         job->sessionID = sessionID;
@@ -140,10 +113,10 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
         //jobQ.Enqueue(job);
     }
-        break;
+    break;
 
     default:
-        //_FILE_LOG(LOG_LEVEL_ERROR, L"ContentsLog", L"Packet Type Error");
+        _FILE_LOG(LOG_LEVEL_ERROR, L"ContentsLog", L"Packet Type Error");
         PacketFree(packet);
         g_jobPool.Free(job);
         Disconnect(sessionID);
@@ -159,7 +132,7 @@ void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
     job->type = en_SERVER_DISCONNECT;
     job->sessionID = sessionID;
     job->packet = NULL;
-    
+
     jobQ.Enqueue(job);
     OnError(timeOutCnt++, L"Time Out!!");
 }
@@ -186,7 +159,7 @@ void ChatServer::_UpdateThread()
             WaitForSingleObject(updateEvent, INFINITE);
             PROFILE_START(_Update);
 
-            //ì‰¬ê²Œ í•  ë°©ë²• ì¶”ê°€ ê³ ë¯¼
+            //½¬°Ô ÇÒ ¹æ¹ı Ãß°¡ °í¹Î
             if (jobQ.Dequeue(&job) == false) {
                 ResetEvent(updateEvent);
                 continue;
@@ -218,7 +191,7 @@ void ChatServer::_UpdateThread()
 
             case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
             {
-                //ì§€ê¸ˆ ë‹¹ì¥ì€ í•¨ìˆ˜ Callì˜ ì´ìœ ê°€ ì—†ìŒ
+                //Áö±İ ´çÀåÀº ÇÔ¼ö CallÀÇ ÀÌÀ¯°¡ ¾øÀ½
                 //Recv_HeartBeat(job->sessionID, job->packet);
             }
             break;
@@ -258,7 +231,7 @@ void ChatServer::ContentsMonitor()
 
     lastUpdateCnt = updateCnt;
 
-    //sectorìš©
+    //sector¿ë
     int cnt;
     int lim;
     int idx = 0;
@@ -267,20 +240,20 @@ void ChatServer::ContentsMonitor()
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
-    //packet ì¶”ì¶œ
+    //packet ÃßÃâ
     PLAYER* player = g_playerPool.Alloc();
     *packet >> player->accountNo;
     packet->GetData((char*)player->ID, 40);
     packet->GetData((char*)player->Nickname, 40);
     packet->GetData(player->sessionKey, 64);
 
-    //í”Œë ˆì´ì–´ ìƒì„± ì„±ê³µ(ì¶”ê°€ ê°€ëŠ¥í•œ í•„í„°ë§ -> ì•„ì´ë””ë‚˜ ë‹‰ë„¤ì„ ê·œì • ìœ„ë°˜)
+    //ÇÃ·¹ÀÌ¾î »ı¼º ¼º°ø(Ãß°¡ °¡´ÉÇÑ ÇÊÅÍ¸µ -> ¾ÆÀÌµğ³ª ´Ğ³×ÀÓ ±ÔÁ¤ À§¹İ)
     if (playerMap.find(sessionID) == playerMap.end()) {
-        //sectorì •ë³´ ì´ˆê¸°í™”ëª©ì 
+        //sectorÁ¤º¸ ÃÊ±âÈ­¸ñÀû
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
-        //player sector mapì— ì‚½ì…
+        //player sector map¿¡ »ğÀÔ
         playerMap.insert({ sessionID, player });
     }
     else {
@@ -293,9 +266,9 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
 {
     CPacket* packet = PacketAlloc();
-    
+
     *packet << (WORD)en_PACKET_SC_CHAT_RES_LOGIN << isSuccess << accountNo;
-    
+
     SendPacket(sessionID, packet);
 }
 
@@ -315,18 +288,18 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
-    //accountNOì²˜ë¦¬ í•œë²ˆë” ê³ ë¯¼
+    //accountNOÃ³¸® ÇÑ¹ø´õ °í¹Î
     *packet >> accountNo >> newSectorX >> newSectorY;
-    
-    //contentsë°©ì–´
+
+    //contents¹æ¾î
     if (player->accountNo != accountNo) {
         Disconnect(sessionID);
         return;
     }
 
-    //oldSector ì œê±°
+    //oldSector Á¦°Å
     std::list<DWORD64>::iterator itr;
-    //monitorìš©
+    //monitor¿ë
     int listSize;
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
@@ -337,14 +310,14 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
             }
         }
     }
-    //newSector ì‚½ì…
-    //contents ë°©ì–´
+    //newSector »ğÀÔ
+    //contents ¹æ¾î
     if (newSectorX >= SECTOR_X_MAX || newSectorY >= SECTOR_Y_MAX)
     {
         Disconnect(sessionID);
         return;
     }
-    
+
     sectorList[newSectorY][newSectorX].emplace_back(sessionID);
 
     player->sectorX = newSectorX;
@@ -356,7 +329,7 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 {
     CPacket* packet = PacketAlloc();
-    
+
     *packet << (WORD)en_PACKET_SC_CHAT_RES_SECTOR_MOVE << player->accountNo << player->sectorX << player->sectorY;
 
     SendPacket(sessionID, packet);
@@ -381,7 +354,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 
     *packet >> accountNo >> msgLen;
 
-    //contentsë°©ì–´
+    //contents¹æ¾î
     if (player->accountNo != accountNo) {
         Disconnect(sessionID);
         return;
@@ -394,17 +367,17 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
-    
+
 
     packet->GetData((char*)msg, msgLen);
 
-    //ì»¨í…ì¸  ëª¨ë‹ˆí„°ë§ìš©
+    //ÄÁÅÙÃ÷ ¸ğ´ÏÅÍ¸µ¿ë
     {
         ++chatCnt;
         if (msg[0] == L'=') {
             ++logOutRecv;
         }
-    }   
+    }
 
     Res_Message(sessionID, msg, msgLen);
 }
@@ -459,35 +432,35 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
     WORD sectorX;
     char cntY;
     char cntX;
-    
+
     std::list<DWORD64>::iterator itr;
 
-	for (cntY = -1; cntY <= 1; ++cntY) {
-		sectorY = player->sectorY + cntY;
-		//WORDì´ë¯€ë¡œ -1 => 65535
-		if (sectorY >= SECTOR_Y_MAX)
-			continue;
+    for (cntY = -1; cntY <= 1; ++cntY) {
+        sectorY = player->sectorY + cntY;
+        //WORDÀÌ¹Ç·Î -1 => 65535
+        if (sectorY >= SECTOR_Y_MAX)
+            continue;
 
-		for (cntX = -1; cntX <= 1; ++cntX) {
-			sectorX = player->sectorX + cntX;
-			if (sectorX >= SECTOR_X_MAX)
-				continue;
+        for (cntX = -1; cntX <= 1; ++cntX) {
+            sectorX = player->sectorX + cntX;
+            if (sectorX >= SECTOR_X_MAX)
+                continue;
 
-			//packet addrefì²˜ë¦¬
-			packet->AddRef(sectorList[sectorY][sectorX].size());
-			//ê° sessionì— sendpacket
-			for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
+            //packet addrefÃ³¸®
+            packet->AddRef(sectorList[sectorY][sectorX].size());
+            //°¢ session¿¡ sendpacket
+            for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
                 if (*itr == sessionID) {
                     SendPacket(*itr, packet);
                 }
                 else {
                     SendEnQ(*itr, packet);
                 }
-			}
-		}
-	}
+            }
+        }
+    }
 
-    //ë³¸ì¸ í¬í•¨ sendë¡œ packetRef 1 ì´ˆê³¼
+    //º»ÀÎ Æ÷ÇÔ send·Î packetRef 1 ÃÊ°ú
     PacketFree(packet);
 }
 
@@ -503,15 +476,15 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     else {
         return;
     }
-    //sectorListì—ì„œ ì œê±°
+    //sectorList¿¡¼­ Á¦°Å
 
-    //mointorìš©
+    //mointor¿ë
     int listSize;
     if (player->sectorY >= SECTOR_Y_MAX || player->sectorX >= SECTOR_X_MAX) {}
     else {
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
-                //mointorìš©
+                //mointor¿ë
                 listSize = sectorList[player->sectorY][player->sectorX].size();
 
                 sectorList[player->sectorY][player->sectorX].erase(itr);
@@ -520,34 +493,8 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         }
     }
 
-    //playerMapì—ì„œ ì œê±°
+    //playerMap¿¡¼­ Á¦°Å
     playerMap.erase(sessionID);
-    
+
     g_playerPool.Free(player);
 }
-
-int main()
-{
-    LogInit();
-    g_ChatServer.Init();
-	
-    timeBeginPeriod(1);
-
-    int logCnt = 0;
-
-    for (;;) {
-        //consoleí™”ë©´ ì§€ì›Œì§€ë‹ˆê¹Œ contentsMontiorëŠ” ê·¸ëƒ¥ ë¡œê·¸ë§Œ ì¶”ê°€í•˜ì„¸ìš”
-        g_ChatServer.Monitor();
-        g_ChatServer.ContentsMonitor();
-        logCnt++;
-        if (logCnt & 0x40) {
-            logCnt ^= 0x40;
-            PROFILE_WRITE();
-            PROFILE_RESET();
-        }
-
-        Sleep(1000);
-    }
-}
-
-

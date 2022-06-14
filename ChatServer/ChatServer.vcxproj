@@ -142,11 +142,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ChatServer.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="Dump.cpp" />
     <ClCompile Include="TimeTracker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatServer.h" />
+    <ClInclude Include="CommonHeaders.h" />
     <ClInclude Include="TimeTracker.h" />
     <ClInclude Include="CommonProtocol.h" />
   </ItemGroup>
