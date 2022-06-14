@@ -52,8 +52,7 @@ ChatServer::~ChatServer()
 
 void ChatServer::Init()
 {
-    int x = GetPrivateProfileInt(L"test", L"x", NULL, L".//ServerSettings.ini");
-    GetPrivateProfileString(L"ChatServer", L"IP", L"0.0.0.0", IP, wcslen(IP), L".//ServerSettings.ini");
+    GetPrivateProfileString(L"ChatServer", L"IP", L"0.0.0.0", IP, 16, L".//ServerSettings.ini");
     PORT = GetPrivateProfileInt(L"ChatServer", L"PORT", NULL, L".//ServerSettings.ini");
     createThreads = GetPrivateProfileInt(L"ChatServer", L"CreateThreads", NULL, L".//ServerSettings.ini");
     runningThreads = GetPrivateProfileInt(L"ChatServer", L"RunningThreads", NULL, L".//ServerSettings.ini");

@@ -28,8 +28,6 @@ public:
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
 
-	//서버 시동용 함수 작성할것
-	virtual void Init() = 0;
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
 	//return false; 시 클라이언트 거부.
@@ -114,8 +112,8 @@ private:
 	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용
 	bool isServerOn;
 
-	CProcessMonitor* volatile myMonitor;
-	CProcessorMonitor* volatile totalMonitor;
+	CProcessMonitor* myMonitor;
+	CProcessorMonitor* totalMonitor;
 
 	//readonly
 	SOCKET listenSock;
