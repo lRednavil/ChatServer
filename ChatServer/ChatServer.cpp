@@ -41,6 +41,10 @@ void ChatServer::Init()
     ThreadInit();
 }
 
+void ChatServer::OnStop()
+{
+}
+
 bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
 {
     return true;
@@ -450,12 +454,13 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             packet->AddRef(sectorList[sectorY][sectorX].size());
             //°¢ session¿¡ sendpacket
             for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                if (*itr == sessionID) {
-                    SendPacket(*itr, packet);
-                }
-                else {
-                    SendEnQ(*itr, packet);
-                }
+                //if (*itr == sessionID) {
+                //    SendPacket(*itr, packet);
+                //}
+                //else {
+                //    SendEnQ(*itr, packet);
+                //}
+                SendPacket(*itr, packet);
             }
         }
     }

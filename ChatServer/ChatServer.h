@@ -38,6 +38,7 @@ public:
 
 //virtual함수 영역
 private:
+	void OnStop();
 	//accept 직후, IP filterinig 등의 목적
 	bool OnConnectionRequest(WCHAR* IP, DWORD Port);
 	//return false; 시 클라이언트 거부.
