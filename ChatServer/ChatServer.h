@@ -31,6 +31,7 @@ public:
 	ChatServer();
 	~ChatServer();
 
+	void Init();
 	void ThreadInit();
 	
 	void ContentsMonitor();
@@ -52,7 +53,8 @@ private:
 	void OnError(int error, const WCHAR* msg);
 
 //chatserver 전용 함수 영역
-	static unsigned int __stdcall _UpdateThread(void* arg);
+	static unsigned int __stdcall UpdateThread(void* arg);
+	void _UpdateThread();
 
 	//모든 Recv함수는 PacketFree할 것
 	//playerMap 삽입
@@ -72,7 +74,7 @@ private:
 
 
 private:
-	CLockFreeQueue<JOB> jobQ;
+	CLockFreeQueue<JOB*> jobQ;
 	//sessionID기준 탐색
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색

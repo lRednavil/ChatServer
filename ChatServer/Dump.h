@@ -9,6 +9,12 @@
 
 #pragma comment(lib, "Dbghelp")
 
+#define CRASH() do{ \
+int *p = 0; \
+*p = 0;	\
+}while(0) \
+
+
 class CDump
 {
 public:

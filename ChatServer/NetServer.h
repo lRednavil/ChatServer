@@ -17,6 +17,8 @@ public:
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
+	//가볍게 enq만 할 경우
+	bool SendEnQ(DWORD64 sessionID, CPacket* packet);
 	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet);
 	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal);
 
@@ -72,6 +74,9 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
 	static unsigned int __stdcall TimerProc(void* arg);
+	void _WorkProc();
+	void _AcceptProc();
+	void _TimerProc();
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
