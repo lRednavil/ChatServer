@@ -1,34 +1,14 @@
-ï»¿#include <iostream>
-#include <Windows.h>
-#include <direct.h>
+#include "stdafx.h"
 
-#include "LockFreeMemoryPool.h"
-#include "LockFreeQueue.h"
-#include "LockFreeStack.h"
-#include "TLSMemoryPool.h"
-#include "NetServer.h"
-#include "ChatServer.h"
-#include "SerializedBuffer.h"
-
-#include "CommonProtocol.h"
-
-//ì—ëŸ¬ ì²˜ë¦¬ìš© ë¤í”„ì™€ ë¡œê¹…
-#include "Dump.h"
-#include "Logging.h"
-
-#pragma comment (lib, "NetworkLibrary")
-#pragma comment (lib, "Winmm")
-
-#define PORT 11601
-#define MAX_CONNECT 17000
-
-#define TIME_OUT 40000
-
-CDump dump;
-ChatServer g_ChatServer;
 WCHAR IP[16] = L"0.0.0.0";
+DWORD PORT;
+DWORD createThreads;
+DWORD runningThreads;
+bool isNagle;
+DWORD maxConnect;
 
 CTLSMemoryPool<PLAYER> g_playerPool;
+CTLSMemoryPool<JOB> g_jobPool;
 
 ChatServer::ChatServer()
 {
@@ -43,25 +23,43 @@ ChatServer::~ChatServer()
 }
 
 
+void ChatServer::Init()
+{
+    GetPrivateProfileString(L"ChatServer", L"IP", L"0.0.0.0", IP, 16, L".//ServerSettings.ini");
+    PORT = GetPrivateProfileInt(L"ChatServer", L"PORT", NULL, L".//ServerSettings.ini");
+    createThreads = GetPrivateProfileInt(L"ChatServer", L"CreateThreads", NULL, L".//ServerSettings.ini");
+    runningThreads = GetPrivateProfileInt(L"ChatServer", L"RunningThreads", NULL, L".//ServerSettings.ini");
+    isNagle = GetPrivateProfileInt(L"ChatServer", L"isNagle", NULL, L".//ServerSettings.ini");
+    maxConnect = GetPrivateProfileInt(L"ChatServer", L"MaxConnect", NULL, L".//ServerSettings.ini");
+
+    if ((PORT * createThreads * runningThreads * maxConnect) == 0) {
+        _FILE_LOG(LOG_LEVEL_ERROR, L"INIT_LOG", L"INVALID ARGUMENTS or No ini FILE");
+        CRASH();
+    }
+
+    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect);
+    ThreadInit();
+}
+
 bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
 {
-	return true;
+    return true;
 }
 
 bool ChatServer::OnClientJoin(DWORD64 sessionID)
 {
-    SetTimeOut(sessionID, TIME_OUT);
-    //ì„ì‹œë¡œ ë¬´ì¡°ê±´ ìŠ¹ì¸ì¤‘
+    SetTimeOut(sessionID, 40000);
+    //ÀÓ½Ã·Î ¹«Á¶°Ç ½ÂÀÎÁß
     return true;
 }
 
 bool ChatServer::OnClientLeave(DWORD64 sessionID)
 {
-    JOB job;
-    job.type = en_SERVER_DISCONNECT;
-    job.sessionID = sessionID;
-    job.packet = NULL;
-    
+    JOB* job = g_jobPool.Alloc();
+    job->type = en_SERVER_DISCONNECT;
+    job->sessionID = sessionID;
+    job->packet = NULL;
+
     jobQ.Enqueue(job);
     SetEvent(updateEvent);
 
@@ -71,26 +69,26 @@ bool ChatServer::OnClientLeave(DWORD64 sessionID)
 void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 {
     WORD type;
-    JOB job;
+    JOB* job = g_jobPool.Alloc();
 
     *packet >> type;
-   
+
     switch (type) {
     case en_PACKET_CS_CHAT_REQ_LOGIN:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_LOGIN;
-        job.sessionID = sessionID;
-        job.packet = packet;
+        job->type = en_PACKET_CS_CHAT_REQ_LOGIN;
+        job->sessionID = sessionID;
+        job->packet = packet;
 
         jobQ.Enqueue(job);
     }
-        break;
+    break;
 
-    case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE: 
+    case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
-        job.sessionID = sessionID;
-        job.packet = packet;
+        job->type = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE;
+        job->sessionID = sessionID;
+        job->packet = packet;
 
         jobQ.Enqueue(job);
     }
@@ -98,9 +96,9 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_MESSAGE:
     {
-        job.type = en_PACKET_CS_CHAT_REQ_MESSAGE;
-        job.sessionID = sessionID;
-        job.packet = packet;
+        job->type = en_PACKET_CS_CHAT_REQ_MESSAGE;
+        job->sessionID = sessionID;
+        job->packet = packet;
 
         jobQ.Enqueue(job);
     }
@@ -108,17 +106,19 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
     case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
     {
-        //job.type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
-        //job.sessionID = sessionID;
-        //job.packet = packet;
+        g_jobPool.Free(job);
+        //job->type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
+        //job->sessionID = sessionID;
+        //job->packet = packet;
 
         //jobQ.Enqueue(job);
     }
-        break;
+    break;
 
     default:
-        //_FILE_LOG(LOG_LEVEL_ERROR, L"ContentsLog", L"Packet Type Error");
+        _FILE_LOG(LOG_LEVEL_ERROR, L"ContentsLog", L"Packet Type Error");
         PacketFree(packet);
+        g_jobPool.Free(job);
         Disconnect(sessionID);
     }
 
@@ -127,84 +127,100 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
 {
-    JOB job;
+    JOB* job = g_jobPool.Alloc();
 
-    job.type = en_SERVER_DISCONNECT;
-    job.sessionID = sessionID;
-    job.packet = NULL;
-    
+    job->type = en_SERVER_DISCONNECT;
+    job->sessionID = sessionID;
+    job->packet = NULL;
+
     jobQ.Enqueue(job);
     OnError(timeOutCnt++, L"Time Out!!");
 }
 
 void ChatServer::OnError(int error, const WCHAR* msg)
 {
-    _LOG(LOG_LEVEL_ERROR, msg);
+    //_LOG(LOG_LEVEL_ERROR, msg);
 }
 
-unsigned int __stdcall ChatServer::_UpdateThread(void* arg)
+unsigned int __stdcall ChatServer::UpdateThread(void* arg)
 {
     ChatServer* server = (ChatServer*)arg;
-    JOB job;
+    server->_UpdateThread();
 
-    while (server->isServerOn) {
-        WaitForSingleObject(server->updateEvent, INFINITE);
-        
-        //ì‰¬ê²Œ í•  ë°©ë²• ì¶”ê°€ ê³ ë¯¼
-        if (server->jobQ.Dequeue(&job) == false) {
-            ResetEvent(server->updateEvent);
-            continue;
-        }
+    return 0;
+}
 
-        server->updateCnt++;
+void ChatServer::_UpdateThread()
+{
+    JOB* job;
 
-        switch (job.type) {
-        case en_PACKET_CS_CHAT_REQ_LOGIN:
-        {        
-            server->Recv_Login(job.sessionID, job.packet);
-        }
-        break;
-
-        case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+    while (isServerOn) {
         {
-            server->Recv_SectorMove(job.sessionID, job.packet);
-        }
-        break;
+            WaitForSingleObject(updateEvent, INFINITE);
+            PROFILE_START(_Update);
 
-        case en_PACKET_CS_CHAT_REQ_MESSAGE:
-        {        
-            server->Recv_Message(job.sessionID, job.packet);
-        }
-        break;
+            //½¬°Ô ÇÒ ¹æ¹ı Ãß°¡ °í¹Î
+            if (jobQ.Dequeue(&job) == false) {
+                ResetEvent(updateEvent);
+                continue;
+            }
 
-        case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-        {
-            //ì§€ê¸ˆ ë‹¹ì¥ì€ í•¨ìˆ˜ Callì˜ ì´ìœ ê°€ ì—†ìŒ
-            //server->Recv_HeartBeat(job.sessionID, job.packet);
-        }
-        break;
-        case en_SERVER_DISCONNECT:
-        {
-            server->DisconnectProc(job.sessionID);
-        }
-        break;
-        default:
-            server->Disconnect(job.sessionID);
-        }
+            updateCnt++;
 
-        if (job.packet != NULL) {
-            server->PacketFree(job.packet);
+            switch (job->type) {
+            case en_PACKET_CS_CHAT_REQ_LOGIN:
+            {
+                PROFILE_START(Login);
+                Recv_Login(job->sessionID, job->packet);
+            }
+            break;
+
+            case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+            {
+                PROFILE_START(SectorMove);
+                Recv_SectorMove(job->sessionID, job->packet);
+            }
+            break;
+
+            case en_PACKET_CS_CHAT_REQ_MESSAGE:
+            {
+                PROFILE_START(RecvMsg);
+                Recv_Message(job->sessionID, job->packet);
+            }
+            break;
+
+            case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
+            {
+                //Áö±İ ´çÀåÀº ÇÔ¼ö CallÀÇ ÀÌÀ¯°¡ ¾øÀ½
+                //Recv_HeartBeat(job->sessionID, job->packet);
+            }
+            break;
+            case en_SERVER_DISCONNECT:
+            {
+                PROFILE_START(DisconnectProc);
+                DisconnectProc(job->sessionID);
+            }
+            break;
+            default:
+                Disconnect(job->sessionID);
+            }
+
+            if (job->packet != NULL) {
+                PROFILE_START(PacketFree);
+                PacketFree(job->packet);
+            }
+
+            g_jobPool.Free(job);
         }
     }
 
-    return 0;
 }
 
 void ChatServer::ThreadInit()
 {
     isServerOn = true;
 
-    hThreads = (HANDLE)_beginthreadex(NULL, 0, _UpdateThread, this, NULL, 0);
+    hThreads = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, NULL, 0);
 }
 
 void ChatServer::ContentsMonitor()
@@ -215,52 +231,29 @@ void ChatServer::ContentsMonitor()
 
     lastUpdateCnt = updateCnt;
 
-    //sectorìš©
+    //sector¿ë
     int cnt;
     int lim;
     int idx = 0;
-
-    wprintf_s(L"Max Sectors : ");
-    lim = 10;
-	for (idx = 49; idx >= 0; --idx) {
-		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
-			wprintf_s(L"%d  ", idx);
-		}
-		lim -= sectorCnt[idx];
-        if (lim <= 0) break;
-	}
-	wprintf_s(L"\n");
-
-	wprintf_s(L"Min Sectors : ");
-	lim = 10;
-	for (idx = 0; idx < 50; ++idx) {
-		for (cnt = 0; cnt < min(sectorCnt[idx], lim); ++cnt) {
-			wprintf_s(L"%d  ", idx);
-		}
-		lim -= sectorCnt[idx];
-        if (lim <= 0) break;
-	}
-    wprintf_s(L"\n");
-
 
 }
 
 void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 {
-    //packet ì¶”ì¶œ
+    //packet ÃßÃâ
     PLAYER* player = g_playerPool.Alloc();
     *packet >> player->accountNo;
     packet->GetData((char*)player->ID, 40);
     packet->GetData((char*)player->Nickname, 40);
     packet->GetData(player->sessionKey, 64);
 
-    //í”Œë ˆì´ì–´ ìƒì„± ì„±ê³µ(ì¶”ê°€ ê°€ëŠ¥í•œ í•„í„°ë§ -> ì•„ì´ë””ë‚˜ ë‹‰ë„¤ì„ ê·œì • ìœ„ë°˜)
+    //ÇÃ·¹ÀÌ¾î »ı¼º ¼º°ø(Ãß°¡ °¡´ÉÇÑ ÇÊÅÍ¸µ -> ¾ÆÀÌµğ³ª ´Ğ³×ÀÓ ±ÔÁ¤ À§¹İ)
     if (playerMap.find(sessionID) == playerMap.end()) {
-        //sectorì •ë³´ ì´ˆê¸°í™”ëª©ì 
+        //sectorÁ¤º¸ ÃÊ±âÈ­¸ñÀû
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
         Res_Login(player->accountNo, sessionID, 1);
-        //player sector mapì— ì‚½ì…
+        //player sector map¿¡ »ğÀÔ
         playerMap.insert({ sessionID, player });
     }
     else {
@@ -273,9 +266,9 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
 void ChatServer::Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess)
 {
     CPacket* packet = PacketAlloc();
-    
+
     *packet << (WORD)en_PACKET_SC_CHAT_RES_LOGIN << isSuccess << accountNo;
-    
+
     SendPacket(sessionID, packet);
 }
 
@@ -295,45 +288,35 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
         return;
     }
 
-    //accountNOì²˜ë¦¬ í•œë²ˆë” ê³ ë¯¼
+    //accountNOÃ³¸® ÇÑ¹ø´õ °í¹Î
     *packet >> accountNo >> newSectorX >> newSectorY;
-    
-    //contentsë°©ì–´
+
+    //contents¹æ¾î
     if (player->accountNo != accountNo) {
         Disconnect(sessionID);
         return;
     }
 
-    //oldSector ì œê±°
+    //oldSector Á¦°Å
     std::list<DWORD64>::iterator itr;
-    //monitorìš©
+    //monitor¿ë
     int listSize;
     if (player->sectorY == SECTOR_Y_MAX || player->sectorX == SECTOR_X_MAX) {}
     else {
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
-                //mointorìš©
-                listSize = sectorList[player->sectorY][player->sectorX].size();
-                --sectorCnt[listSize];
-                ++sectorCnt[listSize - 1];
-
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
             }
         }
     }
-    //newSector ì‚½ì…
-    //contents ë°©ì–´
+    //newSector »ğÀÔ
+    //contents ¹æ¾î
     if (newSectorX >= SECTOR_X_MAX || newSectorY >= SECTOR_Y_MAX)
     {
         Disconnect(sessionID);
         return;
     }
-    
-    //mointorìš©
-    listSize = sectorList[newSectorY][newSectorX].size();
-    --sectorCnt[listSize];
-    ++sectorCnt[listSize + 1];
 
     sectorList[newSectorY][newSectorX].emplace_back(sessionID);
 
@@ -346,7 +329,7 @@ void ChatServer::Recv_SectorMove(DWORD64 sessionID, CPacket* packet)
 void ChatServer::Res_SectorMove(PLAYER* player, DWORD64 sessionID)
 {
     CPacket* packet = PacketAlloc();
-    
+
     *packet << (WORD)en_PACKET_SC_CHAT_RES_SECTOR_MOVE << player->accountNo << player->sectorX << player->sectorY;
 
     SendPacket(sessionID, packet);
@@ -371,7 +354,7 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
 
     *packet >> accountNo >> msgLen;
 
-    //contentsë°©ì–´
+    //contents¹æ¾î
     if (player->accountNo != accountNo) {
         Disconnect(sessionID);
         return;
@@ -384,17 +367,17 @@ void ChatServer::Recv_Message(DWORD64 sessionID, CPacket* packet)
         Disconnect(sessionID);
         return;
     }
-    
+
 
     packet->GetData((char*)msg, msgLen);
 
-    //ì»¨í…ì¸  ëª¨ë‹ˆí„°ë§ìš©
+    //ÄÁÅÙÃ÷ ¸ğ´ÏÅÍ¸µ¿ë
     {
         ++chatCnt;
         if (msg[0] == L'=') {
             ++logOutRecv;
         }
-    }   
+    }
 
     Res_Message(sessionID, msg, msgLen);
 }
@@ -443,27 +426,18 @@ void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 {
-    PLAYER* player;
+    PROFILE_START(SendAround);
+    PLAYER* player = playerMap[sessionID];
     WORD sectorY;
     WORD sectorX;
     char cntY;
     char cntX;
-    //ë””ë²„ê·¸ìš©
-    PLAYER* temp;
-    std::list<DWORD64>::iterator itr;
 
-    //find player
-    if (playerMap.find(sessionID) != playerMap.end()) {
-        player = playerMap[sessionID];
-    }
-    else {
-        Disconnect(sessionID);
-        return;
-    }
+    std::list<DWORD64>::iterator itr;
 
     for (cntY = -1; cntY <= 1; ++cntY) {
         sectorY = player->sectorY + cntY;
-        //WORDì´ë¯€ë¡œ -1 => 65535
+        //WORDÀÌ¹Ç·Î -1 => 65535
         if (sectorY >= SECTOR_Y_MAX)
             continue;
 
@@ -472,16 +446,21 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             if (sectorX >= SECTOR_X_MAX)
                 continue;
 
-            //packet addrefì²˜ë¦¬
+            //packet addrefÃ³¸®
             packet->AddRef(sectorList[sectorY][sectorX].size());
-            //ê° sessionì— sendpacket
+            //°¢ session¿¡ sendpacket
             for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                SendPacket(*itr, packet);
+                if (*itr == sessionID) {
+                    SendPacket(*itr, packet);
+                }
+                else {
+                    SendEnQ(*itr, packet);
+                }
             }
         }
     }
 
-    //ë³¸ì¸ í¬í•¨ sendë¡œ packetRef 1 ì´ˆê³¼
+    //º»ÀÎ Æ÷ÇÔ send·Î packetRef 1 ÃÊ°ú
     PacketFree(packet);
 }
 
@@ -497,18 +476,16 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
     else {
         return;
     }
-    //sectorListì—ì„œ ì œê±°
+    //sectorList¿¡¼­ Á¦°Å
 
-    //mointorìš©
+    //mointor¿ë
     int listSize;
     if (player->sectorY >= SECTOR_Y_MAX || player->sectorX >= SECTOR_X_MAX) {}
     else {
         for (itr = sectorList[player->sectorY][player->sectorX].begin(); itr != sectorList[player->sectorY][player->sectorX].end(); ++itr) {
             if (*itr == sessionID) {
-                //mointorìš©
+                //mointor¿ë
                 listSize = sectorList[player->sectorY][player->sectorX].size();
-                --sectorCnt[listSize];
-                ++sectorCnt[listSize - 1];
 
                 sectorList[player->sectorY][player->sectorX].erase(itr);
                 break;
@@ -516,26 +493,8 @@ void ChatServer::DisconnectProc(DWORD64 sessionID)
         }
     }
 
-    //playerMapì—ì„œ ì œê±°
+    //playerMap¿¡¼­ Á¦°Å
     playerMap.erase(sessionID);
-    
+
     g_playerPool.Free(player);
 }
-
-int main()
-{
-    LogInit();
-	g_ChatServer.Start(IP, PORT, 4, 4, true, MAX_CONNECT);
-    g_ChatServer.ThreadInit();
-
-    timeBeginPeriod(1);
-
-    for (;;) {
-        //consoleí™”ë©´ ì§€ì›Œì§€ë‹ˆê¹Œ contentsMontiorëŠ” ê·¸ëƒ¥ ë¡œê·¸ë§Œ ì¶”ê°€í•˜ì„¸ìš”
-        g_ChatServer.Monitor();
-        g_ChatServer.ContentsMonitor();
-        Sleep(1000);
-    }
-}
-
-
