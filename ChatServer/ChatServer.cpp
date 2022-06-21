@@ -6,6 +6,7 @@ DWORD createThreads;
 DWORD runningThreads;
 bool isNagle;
 DWORD maxConnect;
+DWORD snap;
 
 CTLSMemoryPool<PLAYER> g_playerPool;
 CTLSMemoryPool<JOB> g_jobPool;
@@ -31,13 +32,14 @@ void ChatServer::Init()
     runningThreads = GetPrivateProfileInt(L"ChatServer", L"RunningThreads", NULL, L".//ServerSettings.ini");
     isNagle = GetPrivateProfileInt(L"ChatServer", L"isNagle", NULL, L".//ServerSettings.ini");
     maxConnect = GetPrivateProfileInt(L"ChatServer", L"MaxConnect", NULL, L".//ServerSettings.ini");
+    snap = GetPrivateProfileInt(L"ChatServer", L"SnapLatency", 4, L".//ServerSettings.ini");
 
-    if ((PORT * createThreads * runningThreads * maxConnect) == 0) {
+    if ((PORT * createThreads * runningThreads * maxConnect * snap) == 0) {
         _FILE_LOG(LOG_LEVEL_ERROR, L"INIT_LOG", L"INVALID ARGUMENTS or No ini FILE");
         CRASH();
     }
 
-    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect);
+    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect, snap);
     ThreadInit();
 }
 

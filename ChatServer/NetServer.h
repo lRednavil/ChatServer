@@ -9,7 +9,7 @@ class CNetServer
 {
 public:
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
-	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
+	bool Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency, int packetSize = CPacket::eBUFFER_DEFAULT);
 	void Stop();
 
 	int GetSessionCount();
@@ -18,6 +18,8 @@ public:
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
+	//접속자 전원에게 send
+	void SendPacketToAll(CPacket* packet);
 	//가볍게 enq만 할 경우
 	bool SendEnQ(DWORD64 sessionID, CPacket* packet);
 	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet);
@@ -46,11 +48,11 @@ public:
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
-private:
 	//종료함수 작성용
 	virtual void OnStop() = 0;
+private:
 
-	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
+	bool NetInit(const WCHAR * IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
 
 	void NetClose();
@@ -80,9 +82,11 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
 	static unsigned int __stdcall TimerProc(void* arg);
+	static unsigned int __stdcall SendProc(void* arg);
 	void _WorkProc();
 	void _AcceptProc();
 	void _TimerProc();
+	void _SendProc();
 
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
@@ -112,6 +116,7 @@ private:
 	SESSION* sessionArr;
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
+	CLockFreeQueue<DWORD64> sendSessionQ;
 
 	//monitor
 	DWORD sessionCnt;
@@ -123,7 +128,11 @@ private:
 	CProcessorMonitor* totalMonitor;
 
 	//readonly
+	LPFN_TRANSMITPACKETS transFn;
+	CTLSMemoryPool<CPacket>* packetPool;
+	int packetSize;
 	SOCKET listenSock;
+	DWORD snapLatency;
 	HANDLE hIOCP;
 	int threadCnt;
 
