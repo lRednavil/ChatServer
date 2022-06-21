@@ -145,10 +145,12 @@
     <ClCompile Include="ChatServer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Dump.cpp" />
+    <ClCompile Include="MonitorClient.cpp" />
     <ClCompile Include="TimeTracker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatServer.h" />
+    <ClInclude Include="MonitorClient.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="TimeTracker.h" />
     <ClInclude Include="CommonProtocol.h" />

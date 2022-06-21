@@ -7,6 +7,9 @@
 #include <MSWSock.h>
 
 
+#include "ProcessMonitor.h"
+#include "ProcessorMonitor.h"
+
 #include "LockFreeMemoryPool.h"
 #include "LockFreeQueue.h"
 #include "LockFreeStack.h"
@@ -14,8 +17,10 @@
 #include "SerializedBuffer.h"
 #include "CommonProtocol.h"
 
+#include "LanClient.h"
 #include "NetServer.h"
 #include "ChatServer.h"
+#include "MonitorClient.h"
 
 //¿¡·¯ Ã³¸®¿ë ´ýÇÁ¿Í ·Î±ë
 #include "Dump.h"

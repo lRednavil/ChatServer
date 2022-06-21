@@ -1,19 +1,12 @@
 #include "stdafx.h"
 
-WCHAR IP[16] = L"0.0.0.0";
-DWORD PORT;
-DWORD createThreads;
-DWORD runningThreads;
-bool isNagle;
-DWORD maxConnect;
-DWORD snap;
-
 CTLSMemoryPool<PLAYER> g_playerPool;
 CTLSMemoryPool<JOB> g_jobPool;
 
 ChatServer::ChatServer()
 {
     updateEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
+    monitorClient = new CMonitorClient;
 }
 
 ChatServer::~ChatServer()
@@ -21,11 +14,20 @@ ChatServer::~ChatServer()
     isServerOn = false;
     CloseHandle(updateEvent);
     WaitForSingleObject(hThreads, INFINITE);
+    delete monitorClient;
 }
 
 
 void ChatServer::Init()
 {
+    WCHAR IP[16] = L"0.0.0.0";
+    DWORD PORT;
+    DWORD createThreads;
+    DWORD runningThreads;
+    bool isNagle;
+    DWORD maxConnect;
+    DWORD snap;
+
     GetPrivateProfileString(L"ChatServer", L"IP", L"0.0.0.0", IP, 16, L".//ServerSettings.ini");
     PORT = GetPrivateProfileInt(L"ChatServer", L"PORT", NULL, L".//ServerSettings.ini");
     createThreads = GetPrivateProfileInt(L"ChatServer", L"CreateThreads", NULL, L".//ServerSettings.ini");
@@ -41,6 +43,8 @@ void ChatServer::Init()
 
     Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect, snap);
     ThreadInit();
+
+    monitorClient->Init();
 }
 
 void ChatServer::OnStop()
@@ -231,6 +235,20 @@ void ChatServer::ThreadInit()
 
 void ChatServer::ContentsMonitor()
 {
+    int tv = time(NULL);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_SERVER_RUN, 1, tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_SERVER_CPU, processMonitor.ProcessTotal(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_SERVER_MEM, processMonitor.ProcessPrivateBytes() / 1024 / 1024, tv); // Mbyte´ÜÀ§·Î
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_SESSION, GetSessionCount(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_PLAYER, playerMap.size(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_UPDATE_TPS, updateCnt - lastUpdateCnt, tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL, GetPacketPoolUse(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_UPDATEMSG_POOL, jobQ.GetSize(), tv);
+
+
+    processMonitor.UpdateProcessTime();
+    processorMonitor.UpdateHardwareTime();
+
     wprintf_s(L"========= CONTENTS ========== \n");
     wprintf_s(L"Update TPS : %llu || Left Update Message : %llu \n", updateCnt - lastUpdateCnt, jobQ.GetSize());
     wprintf_s(L"TimeOut : %llu || LogOut : %llu || Chat Recvd : %llu \n", timeOutCnt, logOutRecv, chatCnt);

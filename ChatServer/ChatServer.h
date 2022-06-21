@@ -8,6 +8,8 @@
 #define SECTOR_X_MAX 50
 #define SECTOR_Y_MAX 50
 
+class CMonitorClient;
+
 //player랑 job은 별도 헤더로 빠질수도..?
 struct PLAYER {
 	INT64 accountNo;
@@ -80,6 +82,10 @@ private:
 	std::list<DWORD64> sectorList[SECTOR_Y_MAX][SECTOR_X_MAX];
 	//sessionID기준 탐색
 	std::unordered_map<INT64, PLAYER*> playerMap;
+
+	CProcessMonitor processMonitor;
+	CProcessorMonitor processorMonitor;
+	CMonitorClient* monitorClient;
 
 	DWORD64 timeOutCnt = 0;
 	//메세지에서 L'='수신 카운트
