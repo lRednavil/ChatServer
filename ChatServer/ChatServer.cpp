@@ -246,10 +246,10 @@ void ChatServer::ContentsMonitor()
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_UPDATEMSG_POOL, jobQ.GetSize(), tv);
 
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL, processorMonitor.ProcessorTotal(), tv);
-    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY, processorMonitor.NonPagedMemory(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY, processorMonitor.NonPagedMemory() / 1024 / 1024, tv); // Mbytes´ÜÀ§·Î
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV, processorMonitor.EthernetSendTPS(), tv);
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND, processorMonitor.EthernetRecvTPS(), tv);
-    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY, processorMonitor.AvailableMemory(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY, processorMonitor.AvailableMemory(), tv); 
 
     processMonitor.UpdateProcessTime();
     processorMonitor.UpdateHardwareTime();
