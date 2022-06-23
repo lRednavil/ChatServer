@@ -235,6 +235,7 @@ void ChatServer::ThreadInit()
 
 void ChatServer::ContentsMonitor()
 {
+    if (isServerOn == false) return;
     int tv = time(NULL);
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_SERVER_RUN, 1, tv);
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_SERVER_CPU, processMonitor.ProcessTotal(), tv);
@@ -247,8 +248,8 @@ void ChatServer::ContentsMonitor()
 
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL, processorMonitor.ProcessorTotal(), tv);
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY, processorMonitor.NonPagedMemory() / 1024 / 1024, tv); // Mbytes단위로
-    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV, processorMonitor.EthernetSendTPS(), tv);
-    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND, processorMonitor.EthernetRecvTPS(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV, processorMonitor.EthernetRecvTPS() / 1024, tv); //Kbytes단위로
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND, processorMonitor.EthernetSendTPS() / 1024, tv); //Kbytes단위로
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY, processorMonitor.AvailableMemory(), tv); 
 
     processMonitor.UpdateProcessTime();
