@@ -245,12 +245,14 @@ void ChatServer::ContentsMonitor()
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_UPDATE_TPS, updateCnt - lastUpdateCnt, tv);
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL, GetPacketPoolUse(), tv);
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_UPDATEMSG_POOL, jobQ.GetSize(), tv);
+    monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_CHAT_ACCEPT_TPS, GetAcceptTPS(), tv);
 
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL, processorMonitor.ProcessorTotal(), tv);
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY, processorMonitor.NonPagedMemory() / 1024 / 1024, tv); // Mbytes단위로
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV, processorMonitor.EthernetRecvTPS() / 1024, tv); //Kbytes단위로
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND, processorMonitor.EthernetSendTPS() / 1024, tv); //Kbytes단위로
     monitorClient->UpdateMonitorInfo(dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY, processorMonitor.AvailableMemory(), tv); 
+
 
     processMonitor.UpdateProcessTime();
     processorMonitor.UpdateHardwareTime();
@@ -480,12 +482,6 @@ void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
             packet->AddRef(sectorList[sectorY][sectorX].size());
             //각 session에 sendpacket
             for (itr = sectorList[sectorY][sectorX].begin(); itr != sectorList[sectorY][sectorX].end(); ++itr) {
-                //if (*itr == sessionID) {
-                //    SendPacket(*itr, packet);
-                //}
-                //else {
-                //    SendEnQ(*itr, packet);
-                //}
                 SendPacket(*itr, packet);
             }
         }

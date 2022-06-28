@@ -38,7 +38,6 @@ bool CMonitorClient::OnConnect()
 
 void CMonitorClient::OnRecv(CPacket* packet)
 {
-	CRASH();
 }
 
 void CMonitorClient::OnExpt()
