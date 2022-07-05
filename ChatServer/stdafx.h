@@ -31,4 +31,5 @@
 
 #pragma comment (lib, "NetworkLibrary")
 #pragma comment (lib, "Winmm")
-
+#pragma comment (lib, "cpp_redis")
+#pragma comment (lib, "tacopie")
