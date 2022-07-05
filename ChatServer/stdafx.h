@@ -17,6 +17,8 @@
 #include "SerializedBuffer.h"
 #include "CommonProtocol.h"
 
+#include "cpp_redis/cpp_redis"
+
 #include "LanClient.h"
 #include "NetServer.h"
 #include "ChatServer.h"
