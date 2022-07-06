@@ -383,9 +383,13 @@ void ChatServer::Recv_Login(DWORD64 sessionID, CPacket* packet)
         //sector정보 초기화목적
         player->sectorX = SECTOR_X_MAX;
         player->sectorY = SECTOR_Y_MAX;
-        Res_Login(player->accountNo, sessionID, 1);
         //player sector map에 삽입
         playerMap.insert({ sessionID, player });
+        
+        if (redisThreadCnt == 0)
+            Res_Login(player->accountNo, sessionID, 1);
+        else
+            PutRedisJob(sessionID, player);
     }
     else {
         Res_Login(player->accountNo, sessionID, 0);
