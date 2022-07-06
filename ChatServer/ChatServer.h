@@ -27,6 +27,11 @@ struct JOB {
 	CPacket* packet;
 };
 
+struct REDIS_JOB {
+	DWORD64 sessionID;
+	PLAYER* player;
+};
+
 class ChatServer : public CNetServer
 {
 public:
@@ -34,7 +39,7 @@ public:
 	~ChatServer();
 
 	void Init();
-	void ThreadInit();
+	void ThreadInit(int updateCnt, int redisCnt);
 	
 	void ContentsMonitor();
 
@@ -58,6 +63,12 @@ private:
 //chatserver 전용 함수 영역
 	static unsigned int __stdcall UpdateThread(void* arg);
 	void _UpdateThread();
+
+	//Redis 전용
+	static unsigned int __stdcall RedisThread(void* arg);
+	void _RedisThread();
+	
+	void PutRedisJob(DWORD64 sessionID, PLAYER* player);
 
 	//모든 Recv함수는 PacketFree할 것
 	//playerMap 삽입
@@ -95,12 +106,16 @@ private:
 	DWORD64 updateCnt = 0;
 	DWORD64 lastUpdateCnt = 0;
 
-	int sectorCnt[50] = { 2500, };
+	DWORD redisTLS;
+	HANDLE* hRedis;
+	int redisThreadCnt;
+	HANDLE redisEvent;
+	CLockFreeQueue<REDIS_JOB*>* redisJobQ;
 
 	HANDLE updateEvent;
 
-	//0 for update Thread
-	HANDLE hThreads;
+	HANDLE* hUpdateThreads;
+	int updateThreadCnt;
 	bool isServerOn;
 };
 

@@ -17,7 +17,7 @@
 #include "SerializedBuffer.h"
 #include "CommonProtocol.h"
 
-#include "cpp_redis/cpp_redis"
+#include <cpp_redis/cpp_redis>
 
 #include "LanClient.h"
 #include "NetServer.h"
@@ -31,7 +31,8 @@
 //#define PROFILE_MODE
 #include "TimeTracker.h"
 
-#pragma comment (lib, "NetworkLibrary")
-#pragma comment (lib, "Winmm")
 #pragma comment (lib, "cpp_redis")
 #pragma comment (lib, "tacopie")
+#pragma comment (lib, "NetworkLibrary")
+#pragma comment (lib, "Winmm")
+

@@ -1,20 +1,34 @@
 #include "stdafx.h"
+#include "ChatServer.h"
+
+#include "cpp_redis/cpp_redis"
 
 CTLSMemoryPool<PLAYER> g_playerPool;
 CTLSMemoryPool<JOB> g_jobPool;
+CTLSMemoryPool<REDIS_JOB> g_redisJobPool;
 
 ChatServer::ChatServer()
 {
     updateEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
     monitorClient = new CMonitorClient;
+    redisTLS = TlsAlloc();
+    redisEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
 }
 
 ChatServer::~ChatServer()
 {
     isServerOn = false;
     CloseHandle(updateEvent);
-    WaitForSingleObject(hThreads, INFINITE);
+    WaitForMultipleObjects(updateThreadCnt, hUpdateThreads, true, INFINITE);
+    delete[] hUpdateThreads;
     delete monitorClient;
+
+    //redis
+    SetEvent(redisEvent);
+    WaitForMultipleObjects(redisThreadCnt, hRedis, true, INFINITE);
+    delete[] hRedis;
+    TlsFree(redisTLS);
+    CloseHandle(redisEvent);
 }
 
 
@@ -26,7 +40,9 @@ void ChatServer::Init()
     DWORD runningThreads;
     bool isNagle;
     DWORD maxConnect;
-    DWORD snap;
+
+    int updateThreads;
+    int redisThreads;
 
     GetPrivateProfileString(L"ChatServer", L"IP", L"0.0.0.0", IP, 16, L".//ServerSettings.ini");
     PORT = GetPrivateProfileInt(L"ChatServer", L"PORT", NULL, L".//ServerSettings.ini");
@@ -34,15 +50,17 @@ void ChatServer::Init()
     runningThreads = GetPrivateProfileInt(L"ChatServer", L"RunningThreads", NULL, L".//ServerSettings.ini");
     isNagle = GetPrivateProfileInt(L"ChatServer", L"isNagle", NULL, L".//ServerSettings.ini");
     maxConnect = GetPrivateProfileInt(L"ChatServer", L"MaxConnect", NULL, L".//ServerSettings.ini");
-    snap = GetPrivateProfileInt(L"ChatServer", L"SnapLatency", 4, L".//ServerSettings.ini");
 
-    if ((PORT * createThreads * runningThreads * maxConnect * snap) == 0) {
+    updateThreads = GetPrivateProfileInt(L"ChatServer", L"UpdateThreads", NULL, L".//ServerSettings.ini");
+    redisThreads = GetPrivateProfileInt(L"ChatServer", L"RedisThreads", NULL, L".//ServerSettings.ini");
+
+    if ((PORT * createThreads * runningThreads * maxConnect) == 0) {
         _FILE_LOG(LOG_LEVEL_ERROR, L"INIT_LOG", L"INVALID ARGUMENTS or No ini FILE");
         CRASH();
     }
 
-    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect, snap);
-    ThreadInit();
+    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect);
+    ThreadInit(updateThreads, redisThreads);
 
     monitorClient->Init();
 }
@@ -117,11 +135,6 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
     {
         g_jobPool.Free(job);
-        //job->type = en_PACKET_CS_CHAT_REQ_HEARTBEAT;
-        //job->sessionID = sessionID;
-        //job->packet = packet;
-
-        //jobQ.Enqueue(job);
     }
     break;
 
@@ -167,7 +180,6 @@ void ChatServer::_UpdateThread()
     while (isServerOn) {
         {
             WaitForSingleObject(updateEvent, INFINITE);
-            PROFILE_START(_Update);
 
             //쉬게 할 방법 추가 고민
             if (jobQ.Dequeue(&job) == false) {
@@ -180,21 +192,18 @@ void ChatServer::_UpdateThread()
             switch (job->type) {
             case en_PACKET_CS_CHAT_REQ_LOGIN:
             {
-                PROFILE_START(Login);
                 Recv_Login(job->sessionID, job->packet);
             }
             break;
 
             case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
             {
-                PROFILE_START(SectorMove);
                 Recv_SectorMove(job->sessionID, job->packet);
             }
             break;
 
             case en_PACKET_CS_CHAT_REQ_MESSAGE:
             {
-                PROFILE_START(RecvMsg);
                 Recv_Message(job->sessionID, job->packet);
             }
             break;
@@ -202,12 +211,10 @@ void ChatServer::_UpdateThread()
             case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
             {
                 //지금 당장은 함수 Call의 이유가 없음
-                //Recv_HeartBeat(job->sessionID, job->packet);
             }
             break;
             case en_SERVER_DISCONNECT:
             {
-                PROFILE_START(DisconnectProc);
                 DisconnectProc(job->sessionID);
             }
             break;
@@ -216,7 +223,6 @@ void ChatServer::_UpdateThread()
             }
 
             if (job->packet != NULL) {
-                PROFILE_START(PacketFree);
                 PacketFree(job->packet);
             }
 
@@ -226,11 +232,104 @@ void ChatServer::_UpdateThread()
 
 }
 
-void ChatServer::ThreadInit()
+unsigned int __stdcall ChatServer::RedisThread(void* arg)
 {
+    ChatServer* server = (ChatServer*)arg;
+    server->_RedisThread();
+
+    return 0;
+}
+
+void ChatServer::_RedisThread()
+{
+    REDIS_JOB* job;
+
+    bool loginRes;
+
+    WORD version = MAKEWORD(2, 2);
+    WSADATA data;
+    WSAStartup(version, &data);
+
+    cpp_redis::client* redis = new cpp_redis::client;
+    TlsSetValue(redisTLS, redis);
+
+    redis->connect("10.0.2.2", 6379U, nullptr, 0U, 0, 0U);
+
+    std::string chatKey;
+    std::string value;
+
+    while (isServerOn) {
+        WaitForSingleObject(redisEvent, INFINITE);
+
+        if (redisJobQ->Dequeue(&job) == false) {
+            ResetEvent(redisEvent);
+            continue;
+        }
+
+        chatKey = std::to_string(job->player->accountNo) + ".Chat";
+
+        std::future<cpp_redis::reply> redisFuture;
+        redisFuture = redis->get(chatKey);
+        redis->sync_commit(std::chrono::milliseconds(50));
+
+        cpp_redis::reply rep = redisFuture.get();
+        if (rep.is_string()) {
+            loginRes = memcmp(rep.as_string().c_str(), job->player->sessionKey, 64) == 0;
+        }
+        else {
+            loginRes = false;
+        }
+
+        if (loginRes) {
+            redis->del({ chatKey });
+            redis->sync_commit(std::chrono::milliseconds(50));
+        }
+
+        if (loginRes) {
+            Res_Login(job->player->accountNo, job->sessionID, loginRes);
+        }
+        else {
+            Res_Login(job->player->accountNo, job->sessionID, loginRes);
+            Disconnect(job->sessionID);
+        }
+
+        g_redisJobPool.Free(job);
+    }
+
+    redis->flushall();
+}
+
+
+void ChatServer::PutRedisJob(DWORD64 sessionID, PLAYER* player)
+{
+    REDIS_JOB* job = g_redisJobPool.Alloc();
+
+    job->sessionID = sessionID;
+    job->player = player;
+
+    redisJobQ->Enqueue(job);
+    SetEvent(redisEvent);
+}
+
+void ChatServer::ThreadInit(int updateCnt, int redisCnt)
+{
+    int idx;
+
     isServerOn = true;
 
-    hThreads = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, NULL, 0);
+    updateThreadCnt = updateCnt;
+    redisThreadCnt = redisCnt;
+
+    hUpdateThreads = new HANDLE[updateCnt];
+    hRedis = new HANDLE[redisCnt];
+
+    for (idx = 0; idx < updateCnt; idx++) {
+        hUpdateThreads[idx] = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, NULL, 0);
+    }
+
+    for (idx = 0; idx < redisCnt; idx++) {
+        hRedis[idx] = (HANDLE)_beginthreadex(NULL, 0, RedisThread, this, NULL, 0);
+    }
 }
 
 void ChatServer::ContentsMonitor()
