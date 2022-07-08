@@ -185,5 +185,4 @@ inline int CLockFreeMemoryPool<DATA>::GetUseCount()
 	return useCount;
 }
 
-
 #undef POOLHEADERMASK

@@ -11,6 +11,8 @@ ChatServer::ChatServer()
 {
     updateEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
     monitorClient = new CMonitorClient;
+
+    redisJobQ = new CLockFreeQueue<REDIS_JOB*>;
     redisTLS = TlsAlloc();
     redisEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
 }
@@ -27,6 +29,7 @@ ChatServer::~ChatServer()
     SetEvent(redisEvent);
     WaitForMultipleObjects(redisThreadCnt, hRedis, true, INFINITE);
     delete[] hRedis;
+    delete redisJobQ;
     TlsFree(redisTLS);
     CloseHandle(redisEvent);
 }
@@ -54,7 +57,7 @@ void ChatServer::Init()
     updateThreads = GetPrivateProfileInt(L"ChatServer", L"UpdateThreads", NULL, L".//ServerSettings.ini");
     redisThreads = GetPrivateProfileInt(L"ChatServer", L"RedisThreads", NULL, L".//ServerSettings.ini");
 
-    if ((PORT * createThreads * runningThreads * maxConnect) == 0) {
+    if ((PORT * createThreads * runningThreads * maxConnect * updateThreads) == 0) {
         _FILE_LOG(LOG_LEVEL_ERROR, L"INIT_LOG", L"INVALID ARGUMENTS or No ini FILE");
         CRASH();
     }
@@ -67,6 +70,7 @@ void ChatServer::Init()
 
 void ChatServer::OnStop()
 {
+
 }
 
 bool ChatServer::OnConnectionRequest(WCHAR* IP, DWORD Port)
@@ -148,7 +152,7 @@ void ChatServer::OnRecv(DWORD64 sessionID, CPacket* packet)
     SetEvent(updateEvent);
 }
 
-void ChatServer::OnTimeOut(DWORD64 sessionID, int reason)
+void ChatServer::OnTimeOut(DWORD64 sessionID)
 {
     JOB* job = g_jobPool.Alloc();
 
@@ -355,6 +359,9 @@ void ChatServer::ContentsMonitor()
 
     processMonitor.UpdateProcessTime();
     processorMonitor.UpdateHardwareTime();
+
+    wprintf_s(L"========= SERVER INFO ========== \n");
+    wprintf_s(L"Total Accept : %llu \n", GetTotalAccept());
 
     wprintf_s(L"========= CONTENTS ========== \n");
     wprintf_s(L"Update TPS : %llu || Left Update Message : %llu \n", updateCnt - lastUpdateCnt, jobQ.GetSize());

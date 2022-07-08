@@ -45,7 +45,6 @@ public:
 
 //virtual함수 영역
 private:
-	void OnStop();
 	//accept 직후, IP filterinig 등의 목적
 	bool OnConnectionRequest(WCHAR* IP, DWORD Port);
 	//return false; 시 클라이언트 거부.
@@ -56,10 +55,11 @@ private:
 	//message 분석 역할
 	void OnRecv(DWORD64 sessionID, CPacket* packet);
 	
-	void OnTimeOut(DWORD64 sessionID, int reason);
+	void OnTimeOut(DWORD64 sessionID);
 
 	void OnError(int error, const WCHAR* msg);
 
+	void OnStop();
 //chatserver 전용 함수 영역
 	static unsigned int __stdcall UpdateThread(void* arg);
 	void _UpdateThread();
