@@ -13,14 +13,8 @@ int main()
     int logCnt = 0;
 
     for (;;) {
-        g_ChatServer.ContentsMonitor();
         logCnt++;
-        if (logCnt & 0x40) {
-            logCnt ^= 0x40;
-            PROFILE_WRITE();
-            PROFILE_RESET();
-        }
-
+        g_ChatServer.ContentsMonitor();
         Sleep(1000);
     }
 }

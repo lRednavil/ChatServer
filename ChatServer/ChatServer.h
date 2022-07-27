@@ -70,7 +70,6 @@ private:
 	
 	void PutRedisJob(DWORD64 sessionID, PLAYER* player);
 
-	//모든 Recv함수는 PacketFree할 것
 	//playerMap 삽입
 	void Recv_Login(DWORD64 sessionID, CPacket* packet);
 	void Res_Login(INT64 accountNo, DWORD64 sessionID, BYTE isSuccess);

@@ -143,6 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\LoginServer\LoginServer\MonitorClient.cpp" />
     <ClCompile Include="ChatServer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Dump.cpp" />
@@ -150,6 +151,8 @@
     <ClCompile Include="TimeTracker.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\LoginServer\LoginServer\CommonProtocol.h" />
+    <ClInclude Include="..\..\..\LoginServer\LoginServer\MonitorClient.h" />
     <ClInclude Include="ChatServer.h" />
     <ClInclude Include="MonitorClient.h" />
     <ClInclude Include="stdafx.h" />

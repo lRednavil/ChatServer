@@ -3,7 +3,7 @@
 
 #include "cpp_redis/cpp_redis"
 
-CTLSMemoryPool<PLAYER> g_playerPool;
+CLockFreeMemoryPool<PLAYER> g_playerPool;
 CTLSMemoryPool<JOB> g_jobPool;
 CTLSMemoryPool<REDIS_JOB> g_redisJobPool;
 
@@ -43,6 +43,7 @@ void ChatServer::Init()
     DWORD runningThreads;
     bool isNagle;
     DWORD maxConnect;
+    int packetSize;
 
     int updateThreads;
     int redisThreads;
@@ -53,6 +54,7 @@ void ChatServer::Init()
     runningThreads = GetPrivateProfileInt(L"ChatServer", L"RunningThreads", NULL, L".//ServerSettings.ini");
     isNagle = GetPrivateProfileInt(L"ChatServer", L"isNagle", NULL, L".//ServerSettings.ini");
     maxConnect = GetPrivateProfileInt(L"ChatServer", L"MaxConnect", NULL, L".//ServerSettings.ini");
+    packetSize = GetPrivateProfileInt(L"ChatServer", L"PacketSize", 1460, L".//ServerSettings.ini");
 
     updateThreads = GetPrivateProfileInt(L"ChatServer", L"UpdateThreads", NULL, L".//ServerSettings.ini");
     redisThreads = GetPrivateProfileInt(L"ChatServer", L"RedisThreads", NULL, L".//ServerSettings.ini");
@@ -62,7 +64,7 @@ void ChatServer::Init()
         CRASH();
     }
 
-    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect);
+    Start(IP, PORT, createThreads, runningThreads, isNagle, maxConnect, packetSize);
     ThreadInit(updateThreads, redisThreads);
 
     monitorClient->Init();
@@ -182,56 +184,55 @@ void ChatServer::_UpdateThread()
     JOB* job;
 
     while (isServerOn) {
-        {
-            WaitForSingleObject(updateEvent, INFINITE);
+		WaitForSingleObject(updateEvent, INFINITE);
 
-            //쉬게 할 방법 추가 고민
-            if (jobQ.Dequeue(&job) == false) {
-                ResetEvent(updateEvent);
-                continue;
-            }
+		//쉬게 할 방법 추가 고민
+		if (jobQ.Dequeue(&job) == false) {
+			ResetEvent(updateEvent);
+			continue;
+		}
 
-            updateCnt++;
+		updateCnt++;
 
-            switch (job->type) {
-            case en_PACKET_CS_CHAT_REQ_LOGIN:
-            {
-                Recv_Login(job->sessionID, job->packet);
-            }
-            break;
+		switch (job->type) {
+		    case en_PACKET_CS_CHAT_REQ_LOGIN:
+		    {
+			    Recv_Login(job->sessionID, job->packet);
+		    }
+		    break;
 
-            case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-            {
-                Recv_SectorMove(job->sessionID, job->packet);
-            }
-            break;
+		    case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+		    {
+			    Recv_SectorMove(job->sessionID, job->packet);
+		    }
+		    break;
 
-            case en_PACKET_CS_CHAT_REQ_MESSAGE:
-            {
-                Recv_Message(job->sessionID, job->packet);
-            }
-            break;
+		    case en_PACKET_CS_CHAT_REQ_MESSAGE:
+		    {
+			    Recv_Message(job->sessionID, job->packet);
+		    }
+		    break;
 
-            case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-            {
-                //지금 당장은 함수 Call의 이유가 없음
-            }
-            break;
-            case en_SERVER_DISCONNECT:
-            {
-                DisconnectProc(job->sessionID);
-            }
-            break;
-            default:
-                Disconnect(job->sessionID);
-            }
+		    case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
+		    {
+			    //지금 당장은 함수 Call의 이유가 없음
+		    }
+		    break;
+		    case en_SERVER_DISCONNECT:
+		    {
+			    DisconnectProc(job->sessionID);
+		    }
+		    break;
 
-            if (job->packet != NULL) {
-                PacketFree(job->packet);
-            }
+		    default:
+			    Disconnect(job->sessionID);
+		}
 
-            g_jobPool.Free(job);
-        }
+		if (job->packet != NULL) {
+			PacketFree(job->packet);
+		}
+
+		g_jobPool.Free(job);
     }
 
 }
@@ -568,7 +569,6 @@ void ChatServer::Recv_HeartBeat(DWORD64 sessionID, CPacket* packet)
 
 void ChatServer::SendSectorAround(DWORD64 sessionID, CPacket* packet)
 {
-    PROFILE_START(SendAround);
     PLAYER* player = playerMap[sessionID];
     WORD sectorY;
     WORD sectorX;

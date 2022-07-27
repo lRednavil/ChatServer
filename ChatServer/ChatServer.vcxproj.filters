@@ -30,6 +30,9 @@
     <ClCompile Include="MonitorClient.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\LoginServer\LoginServer\MonitorClient.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommonProtocol.h">
@@ -45,6 +48,12 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="MonitorClient.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\LoginServer\LoginServer\MonitorClient.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\LoginServer\LoginServer\CommonProtocol.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
